@@ -1,5 +1,6 @@
 import { motion } from 'framer-motion';
-import { Leaf, Sparkles } from 'lucide-react';
+import { Leaf, Sparkles, Cpu } from 'lucide-react';
+import { isModelReady } from '@/lib/plantDiseaseModel';
 
 interface AnalyzingViewProps {
   imageUrl: string;
@@ -63,8 +64,18 @@ const AnalyzingView = ({ imageUrl }: AnalyzingViewProps) => {
       </motion.h2>
       
       <p className="text-muted-foreground text-center max-w-xs">
-        Our AI is examining the image to identify any diseases
+        {isModelReady() 
+          ? 'Running TensorFlow.js AI model on your device'
+          : 'Our AI is examining the image to identify any diseases'}
       </p>
+
+      {/* AI Engine indicator */}
+      <div className="flex items-center gap-2 mt-3 px-3 py-1.5 bg-primary/10 rounded-full">
+        <Cpu className="w-4 h-4 text-primary" />
+        <span className="text-xs font-medium text-primary">
+          {isModelReady() ? 'On-Device AI' : 'Demo Mode'}
+        </span>
+      </div>
 
       {/* Progress dots */}
       <div className="flex gap-2 mt-6">
