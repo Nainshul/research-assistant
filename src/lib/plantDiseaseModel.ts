@@ -46,7 +46,8 @@ export type PlantDiseaseClass = typeof PLANT_DISEASE_CLASSES[number];
 
 // Model configuration
 const MODEL_INPUT_SIZE = 224;
-const MODEL_URL = '/models/plant-disease/model.json'; // Local model path
+// CDN-hosted PlantVillage TensorFlow.js model (38 classes)
+const MODEL_URL = 'https://raw.githubusercontent.com/rexsimiloluwah/PLANT-DISEASE-CLASSIFIER-WEB-APP-TENSORFLOWJS/master/tensorflowjs-model/model.json';
 
 let model: tf.GraphModel | tf.LayersModel | null = null;
 let isModelLoading = false;
