@@ -21,7 +21,7 @@ interface ResultCardProps {
 
 const ResultCard = ({ result, onScanAgain }: ResultCardProps) => {
   const confidenceLevel = getConfidenceLevel(result.confidence);
-  const confidenceColor = getConfidenceColor(confidenceLevel);
+  const confidenceColor = getConfidenceColor(result.confidence);
   const isHealthy = result.diseaseName.toLowerCase().includes('healthy');
 
   const speakText = (text: string) => {
@@ -91,7 +91,7 @@ const ResultCard = ({ result, onScanAgain }: ResultCardProps) => {
             initial={{ width: 0 }}
             animate={{ width: `${result.confidence * 100}%` }}
             transition={{ duration: 0.8, ease: 'easeOut' }}
-            className={cn("h-full rounded-full", confidenceColor)}
+            className={cn("h-full rounded-full", `bg-${confidenceColor}`)}
           />
         </div>
         <p className="text-xs text-muted-foreground mt-2">

@@ -24,10 +24,8 @@ export const getConfidenceLevel = (confidence: number): ConfidenceLevel => {
   return 'low';
 };
 
-export const getConfidenceColor = (level: ConfidenceLevel): string => {
-  switch (level) {
-    case 'high': return 'bg-success';
-    case 'medium': return 'bg-warning';
-    case 'low': return 'bg-destructive';
-  }
+export const getConfidenceColor = (confidence: number): string => {
+  if (confidence >= 0.8) return 'success';
+  if (confidence >= 0.5) return 'warning';
+  return 'destructive';
 };
