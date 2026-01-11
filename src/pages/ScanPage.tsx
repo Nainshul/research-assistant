@@ -1,13 +1,15 @@
-import { useState, useEffect } from 'react';
+import { useState } from 'react';
 import AppLayout from '@/components/layout/AppLayout';
 import CameraView from '@/components/scanner/CameraView';
 import AnalyzingView from '@/components/scanner/AnalyzingView';
 import ResultCard from '@/components/scanner/ResultCard';
 import { useDiagnosis } from '@/hooks/useDiagnosis';
 import { usePlantModel } from '@/hooks/usePlantModel';
+import { useScans } from '@/hooks/useScans';
+import { useAuth } from '@/contexts/AuthContext';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Progress } from '@/components/ui/progress';
-import { AlertCircle, Download } from 'lucide-react';
+import { AlertCircle, Download, Cloud } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { motion, AnimatePresence } from 'framer-motion';
 
@@ -18,12 +20,29 @@ const ScanPage = () => {
   const [capturedImage, setCapturedImage] = useState<string | null>(null);
   const { isAnalyzing, result, analyzeImage, clearResult } = useDiagnosis();
   const { isLoading: isModelLoading, isReady: isModelReady, error: modelError, loadProgress, retry } = usePlantModel();
+  const { uploadImage, saveScan } = useScans();
+  const { user } = useAuth();
 
   const handleCapture = async (imageDataUrl: string) => {
     setCapturedImage(imageDataUrl);
     setScanState('analyzing');
     await analyzeImage(imageDataUrl);
     setScanState('result');
+  };
+
+  // Save scan to cloud when result is available and user is logged in
+  const handleSaveToCloud = async () => {
+    if (!result || !capturedImage || !user) return;
+    
+    const imageUrl = await uploadImage(capturedImage);
+    if (imageUrl) {
+      await saveScan(
+        imageUrl,
+        result.diseaseName,
+        result.crop,
+        result.confidence
+      );
+    }
   };
 
   const handleScanAgain = () => {
@@ -104,6 +123,25 @@ const ScanPage = () => {
             result={result} 
             onScanAgain={handleScanAgain}
           />
+          
+          {/* Cloud save button for logged in users */}
+          {user && (
+            <motion.div
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ delay: 0.3 }}
+              className="px-4 pb-4"
+            >
+              <Button 
+                variant="outline" 
+                className="w-full" 
+                onClick={handleSaveToCloud}
+              >
+                <Cloud className="w-4 h-4 mr-2" />
+                Save to History
+              </Button>
+            </motion.div>
+          )}
         </ScrollArea>
       )}
     </AppLayout>
