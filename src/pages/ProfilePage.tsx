@@ -94,13 +94,16 @@ const ProfilePage = () => {
             </div>
           </button>
 
-          <button className="w-full flex items-center gap-4 p-4 bg-card rounded-xl border border-border hover:bg-accent transition-colors">
+          <button 
+            onClick={() => navigate('/settings')}
+            className="w-full flex items-center gap-4 p-4 bg-card rounded-xl border border-border hover:bg-accent transition-colors"
+          >
             <div className="w-10 h-10 rounded-full bg-primary/10 flex items-center justify-center">
               <Settings className="w-5 h-5 text-primary" />
             </div>
             <div className="text-left">
               <p className="font-medium text-foreground">Settings</p>
-              <p className="text-sm text-muted-foreground">Language, notifications</p>
+              <p className="text-sm text-muted-foreground">Update profile info</p>
             </div>
           </button>
         </motion.div>
