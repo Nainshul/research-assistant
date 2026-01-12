@@ -126,4 +126,8 @@
     min-height: 48px;
     min-width: 48px;
   }
+  
+  .bg-gradient-radial {
+    background: radial-gradient(circle at center, var(--tw-gradient-stops));
+  }
 }

@@ -1,5 +1,5 @@
-import { useEffect } from 'react';
-import { Camera, XCircle, Image as ImageIcon } from 'lucide-react';
+import { useEffect, useState } from 'react';
+import { Camera, XCircle, Image as ImageIcon, Zap, Focus, SwitchCamera } from 'lucide-react';
 import { useCamera } from '@/hooks/useCamera';
 import { Button } from '@/components/ui/button';
 import { motion, AnimatePresence } from 'framer-motion';
@@ -11,6 +11,8 @@ interface CameraViewProps {
 
 const CameraView = ({ onCapture, onFileUpload }: CameraViewProps) => {
   const { videoRef, canvasRef, isStreaming, error, startCamera, stopCamera, captureImage } = useCamera();
+  const [isCapturing, setIsCapturing] = useState(false);
+  const [showFlash, setShowFlash] = useState(false);
 
   useEffect(() => {
     startCamera();
@@ -18,10 +20,22 @@ const CameraView = ({ onCapture, onFileUpload }: CameraViewProps) => {
   }, [startCamera, stopCamera]);
 
   const handleCapture = () => {
-    const imageData = captureImage();
-    if (imageData) {
-      onCapture(imageData);
-    }
+    if (!isStreaming) return;
+    
+    setIsCapturing(true);
+    setShowFlash(true);
+    
+    // Flash effect
+    setTimeout(() => setShowFlash(false), 150);
+    
+    // Capture after brief delay for feedback
+    setTimeout(() => {
+      const imageData = captureImage();
+      if (imageData) {
+        onCapture(imageData);
+      }
+      setIsCapturing(false);
+    }, 200);
   };
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -39,7 +53,7 @@ const CameraView = ({ onCapture, onFileUpload }: CameraViewProps) => {
   };
 
   return (
-    <div className="relative w-full h-full bg-foreground/5 rounded-2xl overflow-hidden">
+    <div className="relative w-full h-full bg-black overflow-hidden">
       {/* Hidden canvas for capture */}
       <canvas ref={canvasRef} className="hidden" />
 
@@ -52,7 +66,20 @@ const CameraView = ({ onCapture, onFileUpload }: CameraViewProps) => {
         className="w-full h-full object-cover"
       />
 
-      {/* Scanning overlay */}
+      {/* Flash effect */}
+      <AnimatePresence>
+        {showFlash && (
+          <motion.div
+            initial={{ opacity: 1 }}
+            animate={{ opacity: 0 }}
+            exit={{ opacity: 0 }}
+            transition={{ duration: 0.15 }}
+            className="absolute inset-0 bg-white z-50"
+          />
+        )}
+      </AnimatePresence>
+
+      {/* Advanced scanning overlay */}
       <AnimatePresence>
         {isStreaming && (
           <motion.div
@@ -61,20 +88,71 @@ const CameraView = ({ onCapture, onFileUpload }: CameraViewProps) => {
             exit={{ opacity: 0 }}
             className="absolute inset-0 pointer-events-none"
           >
-            {/* Corner guides */}
-            <div className="absolute inset-8">
-              <div className="absolute top-0 left-0 w-12 h-12 border-t-4 border-l-4 border-primary rounded-tl-lg" />
-              <div className="absolute top-0 right-0 w-12 h-12 border-t-4 border-r-4 border-primary rounded-tr-lg" />
-              <div className="absolute bottom-0 left-0 w-12 h-12 border-b-4 border-l-4 border-primary rounded-bl-lg" />
-              <div className="absolute bottom-0 right-0 w-12 h-12 border-b-4 border-r-4 border-primary rounded-br-lg" />
+            {/* Vignette effect */}
+            <div className="absolute inset-0 bg-gradient-radial from-transparent via-transparent to-black/50" />
+            
+            {/* Scan frame */}
+            <div className="absolute inset-0 flex items-center justify-center">
+              <div className="relative w-72 h-72">
+                {/* Animated corners */}
+                <motion.div
+                  animate={{ scale: [1, 1.02, 1] }}
+                  transition={{ duration: 2, repeat: Infinity }}
+                  className="absolute inset-0"
+                >
+                  {/* Top-left */}
+                  <div className="absolute -top-1 -left-1 w-16 h-16">
+                    <div className="absolute top-0 left-0 w-full h-1 bg-primary rounded-full shadow-[0_0_10px_hsl(var(--primary))]" />
+                    <div className="absolute top-0 left-0 w-1 h-full bg-primary rounded-full shadow-[0_0_10px_hsl(var(--primary))]" />
+                  </div>
+                  {/* Top-right */}
+                  <div className="absolute -top-1 -right-1 w-16 h-16">
+                    <div className="absolute top-0 right-0 w-full h-1 bg-primary rounded-full shadow-[0_0_10px_hsl(var(--primary))]" />
+                    <div className="absolute top-0 right-0 w-1 h-full bg-primary rounded-full shadow-[0_0_10px_hsl(var(--primary))]" />
+                  </div>
+                  {/* Bottom-left */}
+                  <div className="absolute -bottom-1 -left-1 w-16 h-16">
+                    <div className="absolute bottom-0 left-0 w-full h-1 bg-primary rounded-full shadow-[0_0_10px_hsl(var(--primary))]" />
+                    <div className="absolute bottom-0 left-0 w-1 h-full bg-primary rounded-full shadow-[0_0_10px_hsl(var(--primary))]" />
+                  </div>
+                  {/* Bottom-right */}
+                  <div className="absolute -bottom-1 -right-1 w-16 h-16">
+                    <div className="absolute bottom-0 right-0 w-full h-1 bg-primary rounded-full shadow-[0_0_10px_hsl(var(--primary))]" />
+                    <div className="absolute bottom-0 right-0 w-1 h-full bg-primary rounded-full shadow-[0_0_10px_hsl(var(--primary))]" />
+                  </div>
+                </motion.div>
+
+                {/* Cross-hair center */}
+                <div className="absolute inset-0 flex items-center justify-center">
+                  <motion.div
+                    animate={{ opacity: [0.3, 0.8, 0.3] }}
+                    transition={{ duration: 1.5, repeat: Infinity }}
+                  >
+                    <Focus className="w-8 h-8 text-primary/60" />
+                  </motion.div>
+                </div>
+
+                {/* Scanning line */}
+                <motion.div
+                  className="absolute left-0 right-0 h-0.5 bg-gradient-to-r from-transparent via-primary to-transparent"
+                  initial={{ top: 0 }}
+                  animate={{ top: ['0%', '100%', '0%'] }}
+                  transition={{ duration: 2.5, repeat: Infinity, ease: 'easeInOut' }}
+                  style={{ boxShadow: '0 0 20px 4px hsl(var(--primary) / 0.5)' }}
+                />
+              </div>
             </div>
 
-            {/* Scanning line animation */}
-            <motion.div
-              className="absolute left-8 right-8 h-1 bg-gradient-to-r from-transparent via-primary to-transparent"
-              initial={{ top: '10%' }}
-              animate={{ top: ['10%', '90%', '10%'] }}
-              transition={{ duration: 3, repeat: Infinity, ease: 'easeInOut' }}
+            {/* Grid pattern overlay */}
+            <div 
+              className="absolute inset-0 opacity-10"
+              style={{
+                backgroundImage: `
+                  linear-gradient(hsl(var(--primary) / 0.3) 1px, transparent 1px),
+                  linear-gradient(90deg, hsl(var(--primary) / 0.3) 1px, transparent 1px)
+                `,
+                backgroundSize: '30px 30px'
+              }}
             />
           </motion.div>
         )}
@@ -82,55 +160,95 @@ const CameraView = ({ onCapture, onFileUpload }: CameraViewProps) => {
 
       {/* Error state */}
       {error && (
-        <div className="absolute inset-0 flex flex-col items-center justify-center bg-background/90 p-6">
-          <XCircle className="w-16 h-16 text-destructive mb-4" />
-          <p className="text-center text-foreground font-medium mb-2">Camera Error</p>
-          <p className="text-center text-muted-foreground text-sm mb-4">{error}</p>
-          <Button onClick={startCamera} variant="outline">
+        <div className="absolute inset-0 flex flex-col items-center justify-center bg-background/95 p-6">
+          <div className="w-20 h-20 rounded-full bg-destructive/10 flex items-center justify-center mb-4">
+            <XCircle className="w-10 h-10 text-destructive" />
+          </div>
+          <p className="text-center text-foreground font-semibold text-lg mb-2">Camera Access Denied</p>
+          <p className="text-center text-muted-foreground text-sm mb-6 max-w-xs">{error}</p>
+          <Button onClick={startCamera} className="gap-2">
+            <SwitchCamera className="w-4 h-4" />
             Try Again
           </Button>
         </div>
       )}
 
+      {/* Top bar with hints */}
+      {isStreaming && (
+        <motion.div
+          initial={{ y: -20, opacity: 0 }}
+          animate={{ y: 0, opacity: 1 }}
+          className="absolute top-0 left-0 right-0 p-4"
+        >
+          <div className="flex items-center justify-center">
+            <div className="flex items-center gap-2 bg-black/60 backdrop-blur-md px-4 py-2.5 rounded-full border border-white/10">
+              <motion.div
+                animate={{ scale: [1, 1.2, 1] }}
+                transition={{ duration: 1, repeat: Infinity }}
+              >
+                <Zap className="w-4 h-4 text-primary" />
+              </motion.div>
+              <span className="text-white/90 text-sm font-medium">
+                Position leaf in frame
+              </span>
+            </div>
+          </div>
+        </motion.div>
+      )}
+
       {/* Bottom controls */}
-      <div className="absolute bottom-0 left-0 right-0 p-6 bg-gradient-to-t from-foreground/80 to-transparent">
-        <div className="flex items-center justify-center gap-6">
+      <div className="absolute bottom-0 left-0 right-0 pb-8 pt-20 bg-gradient-to-t from-black via-black/80 to-transparent">
+        <div className="flex items-center justify-center gap-8 px-6">
           {/* Gallery upload */}
-          <label className="touch-target w-14 h-14 rounded-full bg-card/90 flex items-center justify-center cursor-pointer hover:bg-card transition-colors">
-            <ImageIcon className="w-6 h-6 text-foreground" />
+          <motion.label 
+            whileHover={{ scale: 1.05 }}
+            whileTap={{ scale: 0.95 }}
+            className="touch-target w-14 h-14 rounded-full bg-white/10 backdrop-blur-md flex items-center justify-center cursor-pointer border border-white/20 hover:bg-white/20 transition-colors"
+          >
+            <ImageIcon className="w-6 h-6 text-white" />
             <input
               type="file"
               accept="image/*"
               onChange={handleFileChange}
               className="hidden"
             />
-          </label>
+          </motion.label>
 
           {/* Capture button */}
-          <button
+          <motion.button
             onClick={handleCapture}
-            disabled={!isStreaming}
-            className="touch-target w-20 h-20 rounded-full bg-primary flex items-center justify-center shadow-xl hover:bg-primary/90 disabled:opacity-50 disabled:cursor-not-allowed transition-all active:scale-95"
+            disabled={!isStreaming || isCapturing}
+            whileHover={{ scale: 1.05 }}
+            whileTap={{ scale: 0.9 }}
+            className="touch-target relative w-20 h-20 rounded-full disabled:opacity-50 disabled:cursor-not-allowed"
             aria-label="Take photo"
           >
-            <div className="w-16 h-16 rounded-full border-4 border-primary-foreground flex items-center justify-center">
-              <Camera className="w-8 h-8 text-primary-foreground" />
-            </div>
-          </button>
+            {/* Outer ring */}
+            <div className="absolute inset-0 rounded-full border-4 border-white" />
+            
+            {/* Inner circle */}
+            <motion.div 
+              className="absolute inset-2 rounded-full bg-white"
+              animate={isCapturing ? { scale: 0.8 } : { scale: 1 }}
+            />
+            
+            {/* Pulse effect */}
+            <motion.div
+              className="absolute inset-0 rounded-full border-2 border-primary"
+              animate={{ scale: [1, 1.3], opacity: [0.5, 0] }}
+              transition={{ duration: 1, repeat: Infinity }}
+            />
+          </motion.button>
 
           {/* Placeholder for symmetry */}
           <div className="w-14 h-14" />
         </div>
-      </div>
 
-      {/* Hint text */}
-      {isStreaming && (
-        <div className="absolute top-4 left-0 right-0 text-center">
-          <p className="text-primary-foreground text-sm font-medium bg-foreground/60 px-4 py-2 rounded-full inline-block">
-            Point camera at the affected plant
-          </p>
-        </div>
-      )}
+        {/* Quick tip */}
+        <p className="text-center text-white/50 text-xs mt-4">
+          Tap to scan • Upload from gallery
+        </p>
+      </div>
     </div>
   );
 };
