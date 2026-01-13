@@ -6,12 +6,14 @@ import ResultCard from '@/components/scanner/ResultCard';
 import { useDiagnosis } from '@/hooks/useDiagnosis';
 import { usePlantModel } from '@/hooks/usePlantModel';
 import { useScans } from '@/hooks/useScans';
+import { useOfflineSync } from '@/hooks/useOfflineSync';
 import { useAuth } from '@/contexts/AuthContext';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Progress } from '@/components/ui/progress';
-import { AlertCircle, Download, Cloud } from 'lucide-react';
+import { AlertCircle, Download, Cloud, WifiOff } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { motion, AnimatePresence } from 'framer-motion';
+import { toast } from 'sonner';
 
 type ScanState = 'camera' | 'analyzing' | 'result';
 
@@ -21,6 +23,7 @@ const ScanPage = () => {
   const { isAnalyzing, result, analyzeImage, clearResult } = useDiagnosis();
   const { isLoading: isModelLoading, isReady: isModelReady, error: modelError, loadProgress, retry } = usePlantModel();
   const { uploadImage, saveScan } = useScans();
+  const { isOnline, addPendingScan } = useOfflineSync();
   const { user } = useAuth();
 
   const handleCapture = async (imageDataUrl: string) => {
@@ -34,6 +37,18 @@ const ScanPage = () => {
   const handleSaveToCloud = async () => {
     if (!result || !capturedImage || !user) return;
     
+    // If offline, save to pending queue
+    if (!isOnline) {
+      addPendingScan({
+        imageDataUrl: capturedImage,
+        diseaseName: result.diseaseName,
+        cropName: result.crop,
+        confidence: result.confidence,
+      });
+      toast.success('Scan saved locally - will sync when online');
+      return;
+    }
+    
     const imageUrl = await uploadImage(capturedImage);
     if (imageUrl) {
       await saveScan(
@@ -42,6 +57,7 @@ const ScanPage = () => {
         result.crop,
         result.confidence
       );
+      toast.success('Scan saved to history');
     }
   };
 
@@ -137,8 +153,17 @@ const ScanPage = () => {
                 className="w-full" 
                 onClick={handleSaveToCloud}
               >
-                <Cloud className="w-4 h-4 mr-2" />
-                Save to History
+                {isOnline ? (
+                  <>
+                    <Cloud className="w-4 h-4 mr-2" />
+                    Save to History
+                  </>
+                ) : (
+                  <>
+                    <WifiOff className="w-4 h-4 mr-2" />
+                    Save Offline
+                  </>
+                )}
               </Button>
             </motion.div>
           )}
