@@ -1,8 +1,10 @@
-import { useEffect, useState } from 'react';
-import { Camera, XCircle, Image as ImageIcon, Zap, Focus, SwitchCamera } from 'lucide-react';
+import { useEffect, useState, useCallback } from 'react';
+import { Camera, XCircle, Image as ImageIcon, Zap, Focus, SwitchCamera, Mic, MicOff } from 'lucide-react';
 import { useCamera } from '@/hooks/useCamera';
+import useSpeechRecognition from '@/hooks/useSpeechRecognition';
 import { Button } from '@/components/ui/button';
 import { motion, AnimatePresence } from 'framer-motion';
+import { useToast } from '@/hooks/use-toast';
 
 interface CameraViewProps {
   onCapture: (imageDataUrl: string) => void;
@@ -13,14 +15,12 @@ const CameraView = ({ onCapture, onFileUpload }: CameraViewProps) => {
   const { videoRef, canvasRef, isStreaming, error, startCamera, stopCamera, captureImage } = useCamera();
   const [isCapturing, setIsCapturing] = useState(false);
   const [showFlash, setShowFlash] = useState(false);
+  const [voiceEnabled, setVoiceEnabled] = useState(false);
+  const [showVoiceFeedback, setShowVoiceFeedback] = useState(false);
+  const { toast } = useToast();
 
-  useEffect(() => {
-    startCamera();
-    return () => stopCamera();
-  }, [startCamera, stopCamera]);
-
-  const handleCapture = () => {
-    if (!isStreaming) return;
+  const handleCapture = useCallback(() => {
+    if (!isStreaming || isCapturing) return;
     
     setIsCapturing(true);
     setShowFlash(true);
@@ -36,6 +36,59 @@ const CameraView = ({ onCapture, onFileUpload }: CameraViewProps) => {
       }
       setIsCapturing(false);
     }, 200);
+  }, [isStreaming, isCapturing, captureImage, onCapture]);
+
+  const handleVoiceCommand = useCallback((command: string) => {
+    setShowVoiceFeedback(true);
+    setTimeout(() => setShowVoiceFeedback(false), 1000);
+    
+    toast({
+      title: "Voice Command",
+      description: `Detected: "${command.trim()}"`,
+      duration: 1500,
+    });
+    
+    handleCapture();
+  }, [handleCapture, toast]);
+
+  const { 
+    isListening, 
+    isSupported: isSpeechSupported, 
+    transcript,
+    error: speechError,
+    startListening, 
+    stopListening 
+  } = useSpeechRecognition({
+    onCommand: handleVoiceCommand,
+    triggerWords: ['scan', 'capture', 'photo', 'click', 'take', 'shoot', 'snap'],
+  });
+
+  useEffect(() => {
+    startCamera();
+    return () => {
+      stopCamera();
+      stopListening();
+    };
+  }, [startCamera, stopCamera, stopListening]);
+
+  useEffect(() => {
+    if (voiceEnabled && isSpeechSupported) {
+      startListening();
+    } else {
+      stopListening();
+    }
+  }, [voiceEnabled, isSpeechSupported, startListening, stopListening]);
+
+  const toggleVoice = () => {
+    if (!isSpeechSupported) {
+      toast({
+        title: "Not Supported",
+        description: "Voice input is not supported in your browser",
+        variant: "destructive",
+      });
+      return;
+    }
+    setVoiceEnabled(!voiceEnabled);
   };
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -76,6 +129,22 @@ const CameraView = ({ onCapture, onFileUpload }: CameraViewProps) => {
             transition={{ duration: 0.15 }}
             className="absolute inset-0 bg-white z-50"
           />
+        )}
+      </AnimatePresence>
+
+      {/* Voice command feedback overlay */}
+      <AnimatePresence>
+        {showVoiceFeedback && (
+          <motion.div
+            initial={{ opacity: 0, scale: 0.8 }}
+            animate={{ opacity: 1, scale: 1 }}
+            exit={{ opacity: 0, scale: 0.8 }}
+            className="absolute inset-0 flex items-center justify-center z-40 pointer-events-none"
+          >
+            <div className="bg-primary/90 backdrop-blur-md rounded-full p-6">
+              <Mic className="w-12 h-12 text-primary-foreground" />
+            </div>
+          </motion.div>
         )}
       </AnimatePresence>
 
@@ -173,14 +242,44 @@ const CameraView = ({ onCapture, onFileUpload }: CameraViewProps) => {
         </div>
       )}
 
-      {/* Top bar with hints */}
+      {/* Top bar with hints and voice control */}
       {isStreaming && (
         <motion.div
           initial={{ y: -20, opacity: 0 }}
           animate={{ y: 0, opacity: 1 }}
           className="absolute top-0 left-0 right-0 p-4"
         >
-          <div className="flex items-center justify-center">
+          <div className="flex items-center justify-between">
+            {/* Voice control toggle */}
+            <motion.button
+              onClick={toggleVoice}
+              whileHover={{ scale: 1.05 }}
+              whileTap={{ scale: 0.95 }}
+              className={`flex items-center gap-2 px-3 py-2 rounded-full backdrop-blur-md border transition-all ${
+                voiceEnabled 
+                  ? 'bg-primary/80 border-primary text-primary-foreground' 
+                  : 'bg-black/60 border-white/10 text-white/90'
+              }`}
+            >
+              {voiceEnabled ? (
+                <>
+                  <motion.div
+                    animate={{ scale: [1, 1.2, 1] }}
+                    transition={{ duration: 0.5, repeat: Infinity }}
+                  >
+                    <Mic className="w-4 h-4" />
+                  </motion.div>
+                  <span className="text-xs font-medium">Voice ON</span>
+                </>
+              ) : (
+                <>
+                  <MicOff className="w-4 h-4" />
+                  <span className="text-xs font-medium">Voice</span>
+                </>
+              )}
+            </motion.button>
+
+            {/* Hint */}
             <div className="flex items-center gap-2 bg-black/60 backdrop-blur-md px-4 py-2.5 rounded-full border border-white/10">
               <motion.div
                 animate={{ scale: [1, 1.2, 1] }}
@@ -192,7 +291,59 @@ const CameraView = ({ onCapture, onFileUpload }: CameraViewProps) => {
                 Position leaf in frame
               </span>
             </div>
+
+            {/* Spacer for balance */}
+            <div className="w-20" />
           </div>
+
+          {/* Voice listening indicator */}
+          <AnimatePresence>
+            {voiceEnabled && isListening && (
+              <motion.div
+                initial={{ opacity: 0, y: -10 }}
+                animate={{ opacity: 1, y: 0 }}
+                exit={{ opacity: 0, y: -10 }}
+                className="flex justify-center mt-3"
+              >
+                <div className="flex items-center gap-2 bg-primary/20 backdrop-blur-md px-4 py-2 rounded-full border border-primary/30">
+                  <div className="flex gap-0.5">
+                    {[...Array(4)].map((_, i) => (
+                      <motion.div
+                        key={i}
+                        className="w-1 bg-primary rounded-full"
+                        animate={{ height: [8, 16, 8] }}
+                        transition={{ 
+                          duration: 0.5, 
+                          repeat: Infinity, 
+                          delay: i * 0.1,
+                          ease: "easeInOut"
+                        }}
+                      />
+                    ))}
+                  </div>
+                  <span className="text-primary text-xs font-medium">
+                    Say "scan" or "capture"
+                  </span>
+                </div>
+              </motion.div>
+            )}
+          </AnimatePresence>
+
+          {/* Transcript display */}
+          <AnimatePresence>
+            {voiceEnabled && transcript && (
+              <motion.div
+                initial={{ opacity: 0, y: -5 }}
+                animate={{ opacity: 1, y: 0 }}
+                exit={{ opacity: 0 }}
+                className="flex justify-center mt-2"
+              >
+                <div className="bg-black/70 backdrop-blur-md px-3 py-1.5 rounded-lg border border-white/10">
+                  <p className="text-white/70 text-xs italic">"{transcript}"</p>
+                </div>
+              </motion.div>
+            )}
+          </AnimatePresence>
         </motion.div>
       )}
 
@@ -240,13 +391,31 @@ const CameraView = ({ onCapture, onFileUpload }: CameraViewProps) => {
             />
           </motion.button>
 
-          {/* Placeholder for symmetry */}
-          <div className="w-14 h-14" />
+          {/* Voice button for quick access */}
+          <motion.button
+            onClick={toggleVoice}
+            whileHover={{ scale: 1.05 }}
+            whileTap={{ scale: 0.95 }}
+            className={`touch-target w-14 h-14 rounded-full backdrop-blur-md flex items-center justify-center border transition-colors ${
+              voiceEnabled 
+                ? 'bg-primary/80 border-primary' 
+                : 'bg-white/10 border-white/20 hover:bg-white/20'
+            }`}
+          >
+            {voiceEnabled ? (
+              <Mic className="w-6 h-6 text-primary-foreground" />
+            ) : (
+              <MicOff className="w-6 h-6 text-white" />
+            )}
+          </motion.button>
         </div>
 
         {/* Quick tip */}
         <p className="text-center text-white/50 text-xs mt-4">
-          Tap to scan • Upload from gallery
+          {voiceEnabled 
+            ? 'Say "scan" or "capture" • Tap to scan' 
+            : 'Tap to scan • Enable voice for hands-free'
+          }
         </p>
       </div>
     </div>
