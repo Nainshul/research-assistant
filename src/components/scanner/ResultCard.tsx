@@ -1,4 +1,5 @@
-import { motion } from 'framer-motion';
+import { useState } from 'react';
+import { motion, AnimatePresence } from 'framer-motion';
 import { DiagnosisResult, getConfidenceLevel, getConfidenceColor } from '@/types/diagnosis';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Button } from '@/components/ui/button';
@@ -8,6 +9,9 @@ import {
   FlaskConical, 
   Leaf, 
   Volume2,
+  VolumeX,
+  Pause,
+  Play,
   RefreshCw,
   Share2,
   ShieldCheck,
@@ -16,6 +20,8 @@ import {
   Sparkles
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
+import { useTextToSpeech } from '@/hooks/useTextToSpeech';
+import { useLanguage } from '@/contexts/LanguageContext';
 
 interface ResultCardProps {
   result: DiagnosisResult;
@@ -27,14 +33,48 @@ const ResultCard = ({ result, onScanAgain }: ResultCardProps) => {
   const confidenceColor = getConfidenceColor(result.confidence);
   const isHealthy = result.diseaseName.toLowerCase().includes('healthy');
   const confidencePercent = Math.round(result.confidence * 100);
+  
+  const { language } = useLanguage();
+  const { speak, speakSequence, stop, togglePause, isSpeaking, isPaused, isSupported } = useTextToSpeech({ language });
+  const [isReadingAll, setIsReadingAll] = useState(false);
 
   const speakText = (text: string) => {
-    if ('speechSynthesis' in window) {
-      speechSynthesis.cancel();
-      const utterance = new SpeechSynthesisUtterance(text);
-      utterance.rate = 0.9;
-      speechSynthesis.speak(utterance);
+    if (isSpeaking) {
+      stop();
+      return;
     }
+    speak(text);
+  };
+
+  const readAllResults = () => {
+    if (isReadingAll) {
+      stop();
+      setIsReadingAll(false);
+      return;
+    }
+
+    setIsReadingAll(true);
+    
+    const texts = [
+      // Intro
+      `Scan result for ${result.crop}.`,
+      // Status
+      isHealthy 
+        ? `Good news! Your plant is healthy.`
+        : `Disease detected: ${result.diseaseName}.`,
+      // Confidence
+      `AI confidence level: ${confidencePercent} percent, ${confidenceLevel} accuracy.`,
+      // Chemical treatment
+      `Chemical treatment option: ${result.remedy.chemicalSolution}`,
+      // Organic treatment
+      `Natural treatment option: ${result.remedy.organicSolution}`,
+      // Prevention
+      `Prevention tips: ${result.remedy.prevention}`,
+    ];
+
+    speakSequence(texts, () => {
+      setIsReadingAll(false);
+    });
   };
 
   const handleShare = async () => {
@@ -57,7 +97,7 @@ const ResultCard = ({ result, onScanAgain }: ResultCardProps) => {
       className="p-4"
     >
       {/* Hero Result Card */}
-      <div className="relative rounded-3xl overflow-hidden mb-6 shadow-xl">
+      <div className="relative rounded-3xl overflow-hidden mb-4 shadow-xl">
         <img
           src={result.imageUrl}
           alt="Scanned plant"
@@ -119,6 +159,64 @@ const ResultCard = ({ result, onScanAgain }: ResultCardProps) => {
           </motion.p>
         </div>
       </div>
+
+      {/* Read All Button - TTS Control */}
+      {isSupported && (
+        <motion.div
+          initial={{ y: 20, opacity: 0 }}
+          animate={{ y: 0, opacity: 1 }}
+          transition={{ delay: 0.45 }}
+          className="mb-4"
+        >
+          <Button
+            onClick={readAllResults}
+            variant={isReadingAll ? "default" : "outline"}
+            className={cn(
+              "w-full h-14 rounded-xl gap-3 text-base font-medium transition-all",
+              isReadingAll && "bg-primary text-primary-foreground"
+            )}
+          >
+            <AnimatePresence mode="wait">
+              {isReadingAll ? (
+                <motion.div
+                  key="speaking"
+                  initial={{ scale: 0 }}
+                  animate={{ scale: 1 }}
+                  exit={{ scale: 0 }}
+                  className="flex items-center gap-3"
+                >
+                  {isPaused ? (
+                    <>
+                      <Play className="w-5 h-5" onClick={(e) => { e.stopPropagation(); togglePause(); }} />
+                      <span>Paused - Tap to Resume</span>
+                    </>
+                  ) : (
+                    <>
+                      <div className="flex items-center gap-1">
+                        <span className="w-1 h-4 bg-primary-foreground rounded-full animate-pulse" />
+                        <span className="w-1 h-6 bg-primary-foreground rounded-full animate-pulse delay-75" />
+                        <span className="w-1 h-3 bg-primary-foreground rounded-full animate-pulse delay-150" />
+                      </div>
+                      <span>Reading... Tap to Stop</span>
+                    </>
+                  )}
+                </motion.div>
+              ) : (
+                <motion.div
+                  key="idle"
+                  initial={{ scale: 0 }}
+                  animate={{ scale: 1 }}
+                  exit={{ scale: 0 }}
+                  className="flex items-center gap-3"
+                >
+                  <Volume2 className="w-5 h-5" />
+                  <span>🔊 Read All Results Aloud</span>
+                </motion.div>
+              )}
+            </AnimatePresence>
+          </Button>
+        </motion.div>
+      )}
 
       {/* Confidence Score Card */}
       <motion.div
@@ -217,10 +315,17 @@ const ResultCard = ({ result, onScanAgain }: ResultCardProps) => {
                 </div>
                 <button 
                   onClick={() => speakText(result.remedy.chemicalSolution)}
-                  className="touch-target w-10 h-10 rounded-full bg-primary/10 flex items-center justify-center hover:bg-primary/20 transition-colors"
+                  className={cn(
+                    "touch-target w-10 h-10 rounded-full flex items-center justify-center transition-colors",
+                    isSpeaking && !isReadingAll ? "bg-primary text-primary-foreground" : "bg-primary/10 hover:bg-primary/20"
+                  )}
                   aria-label="Read aloud"
                 >
-                  <Volume2 className="w-5 h-5 text-primary" />
+                  {isSpeaking && !isReadingAll ? (
+                    <VolumeX className="w-5 h-5" />
+                  ) : (
+                    <Volume2 className="w-5 h-5 text-primary" />
+                  )}
                 </button>
               </div>
               <p className="text-muted-foreground leading-relaxed text-sm">
@@ -240,10 +345,17 @@ const ResultCard = ({ result, onScanAgain }: ResultCardProps) => {
                 </div>
                 <button 
                   onClick={() => speakText(result.remedy.organicSolution)}
-                  className="touch-target w-10 h-10 rounded-full bg-primary/10 flex items-center justify-center hover:bg-primary/20 transition-colors"
+                  className={cn(
+                    "touch-target w-10 h-10 rounded-full flex items-center justify-center transition-colors",
+                    isSpeaking && !isReadingAll ? "bg-primary text-primary-foreground" : "bg-primary/10 hover:bg-primary/20"
+                  )}
                   aria-label="Read aloud"
                 >
-                  <Volume2 className="w-5 h-5 text-primary" />
+                  {isSpeaking && !isReadingAll ? (
+                    <VolumeX className="w-5 h-5" />
+                  ) : (
+                    <Volume2 className="w-5 h-5 text-primary" />
+                  )}
                 </button>
               </div>
               <p className="text-muted-foreground leading-relaxed text-sm">
