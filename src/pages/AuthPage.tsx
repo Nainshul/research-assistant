@@ -1,15 +1,13 @@
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { motion } from 'framer-motion';
-import { Leaf, Mail, Lock, User, ArrowLeft, Eye, EyeOff } from 'lucide-react';
+import { Leaf, Mail, Lock, User, ArrowLeft, Eye, EyeOff, CheckCircle } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Separator } from '@/components/ui/separator';
 import { useAuth } from '@/contexts/AuthContext';
 import { useToast } from '@/hooks/use-toast';
-
-type AuthMode = 'signin' | 'signup';
 
 const GoogleIcon = () => (
   <svg className="w-5 h-5" viewBox="0 0 24 24">
@@ -32,15 +30,18 @@ const GoogleIcon = () => (
   </svg>
 );
 
+type AuthMode = 'signin' | 'signup' | 'forgot';
+
 const AuthPage = () => {
   const navigate = useNavigate();
-  const { signIn, signUp, signInWithProvider } = useAuth();
+  const { signIn, signUp, signInWithProvider, resetPassword } = useAuth();
   const { toast } = useToast();
   
   const [mode, setMode] = useState<AuthMode>('signin');
   const [isLoading, setIsLoading] = useState(false);
   const [isGoogleLoading, setIsGoogleLoading] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
+  const [resetEmailSent, setResetEmailSent] = useState(false);
   
   const [formData, setFormData] = useState({
     email: '',
@@ -62,8 +63,37 @@ const AuthPage = () => {
     // Don't set loading to false on success - page will redirect
   };
 
+  const handleForgotPassword = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setIsLoading(true);
+
+    try {
+      const { error } = await resetPassword(formData.email);
+      if (error) {
+        toast({
+          title: 'Reset failed',
+          description: error.message,
+          variant: 'destructive',
+        });
+      } else {
+        setResetEmailSent(true);
+        toast({
+          title: 'Check your email',
+          description: 'We sent you a password reset link.',
+        });
+      }
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    
+    if (mode === 'forgot') {
+      return handleForgotPassword(e);
+    }
+    
     setIsLoading(true);
 
     try {
@@ -103,19 +133,76 @@ const AuthPage = () => {
     }
   };
 
+  const getHeaderTitle = () => {
+    if (mode === 'forgot') return 'Reset Password';
+    if (mode === 'signup') return 'Create Account';
+    return 'Sign In';
+  };
+
+  const getSubtitle = () => {
+    if (mode === 'forgot') return 'Enter your email to reset password';
+    if (mode === 'signup') return 'Join the farming community';
+    return 'Welcome back!';
+  };
+
+  // Show success screen for forgot password
+  if (mode === 'forgot' && resetEmailSent) {
+    return (
+      <div className="min-h-screen bg-background max-w-[430px] mx-auto">
+        <div className="p-4 flex items-center gap-4">
+          <button 
+            onClick={() => {
+              setMode('signin');
+              setResetEmailSent(false);
+            }}
+            className="touch-target w-10 h-10 flex items-center justify-center rounded-full bg-muted"
+          >
+            <ArrowLeft className="w-5 h-5" />
+          </button>
+          <h1 className="text-lg font-semibold">Reset Password</h1>
+        </div>
+        
+        <div className="px-6 py-8 flex flex-col items-center">
+          <motion.div
+            initial={{ scale: 0.9, opacity: 0 }}
+            animate={{ scale: 1, opacity: 1 }}
+            className="text-center"
+          >
+            <div className="w-20 h-20 rounded-full bg-primary/10 flex items-center justify-center mx-auto mb-4">
+              <CheckCircle className="w-10 h-10 text-primary" />
+            </div>
+            <h2 className="text-2xl font-bold text-foreground mb-2">Check Your Email</h2>
+            <p className="text-muted-foreground mb-6">
+              We sent a password reset link to<br />
+              <span className="font-medium text-foreground">{formData.email}</span>
+            </p>
+            <Button 
+              variant="outline"
+              onClick={() => {
+                setMode('signin');
+                setResetEmailSent(false);
+              }}
+              className="w-full h-12"
+            >
+              Back to Sign In
+            </Button>
+          </motion.div>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="min-h-screen bg-background max-w-[430px] mx-auto">
       {/* Header */}
       <div className="p-4 flex items-center gap-4">
         <button 
-          onClick={() => navigate(-1)}
+          onClick={() => mode === 'forgot' ? setMode('signin') : navigate(-1)}
           className="touch-target w-10 h-10 flex items-center justify-center rounded-full bg-muted"
         >
           <ArrowLeft className="w-5 h-5" />
         </button>
-        <h1 className="text-lg font-semibold">
-          {mode === 'signin' ? 'Sign In' : 'Create Account'}
-        </h1>
+        <h1 className="text-lg font-semibold">{getHeaderTitle()}</h1>
       </div>
 
       <div className="px-6 py-8">
@@ -129,9 +216,7 @@ const AuthPage = () => {
             <Leaf className="w-10 h-10 text-primary" />
           </div>
           <h2 className="text-2xl font-bold text-foreground">Crop-Doc</h2>
-          <p className="text-muted-foreground text-sm mt-1">
-            {mode === 'signin' ? 'Welcome back!' : 'Join the farming community'}
-          </p>
+          <p className="text-muted-foreground text-sm mt-1">{getSubtitle()}</p>
         </motion.div>
 
         {/* Form */}
@@ -175,68 +260,91 @@ const AuthPage = () => {
             </div>
           </div>
 
-          <div className="space-y-2">
-            <Label htmlFor="password">Password</Label>
-            <div className="relative">
-              <Lock className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-muted-foreground" />
-              <Input
-                id="password"
-                type={showPassword ? 'text' : 'password'}
-                placeholder="Enter your password"
-                className="pl-10 pr-10 h-12"
-                required
-                minLength={6}
-                value={formData.password}
-                onChange={(e) => setFormData(prev => ({ ...prev, password: e.target.value }))}
-              />
-              <button
-                type="button"
-                onClick={() => setShowPassword(!showPassword)}
-                className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground"
-              >
-                {showPassword ? <EyeOff className="w-5 h-5" /> : <Eye className="w-5 h-5" />}
-              </button>
+          {mode !== 'forgot' && (
+            <div className="space-y-2">
+              <div className="flex justify-between items-center">
+                <Label htmlFor="password">Password</Label>
+                {mode === 'signin' && (
+                  <button
+                    type="button"
+                    onClick={() => setMode('forgot')}
+                    className="text-sm text-primary hover:underline"
+                  >
+                    Forgot password?
+                  </button>
+                )}
+              </div>
+              <div className="relative">
+                <Lock className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-muted-foreground" />
+                <Input
+                  id="password"
+                  type={showPassword ? 'text' : 'password'}
+                  placeholder="Enter your password"
+                  className="pl-10 pr-10 h-12"
+                  required
+                  minLength={6}
+                  value={formData.password}
+                  onChange={(e) => setFormData(prev => ({ ...prev, password: e.target.value }))}
+                />
+                <button
+                  type="button"
+                  onClick={() => setShowPassword(!showPassword)}
+                  className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground"
+                >
+                  {showPassword ? <EyeOff className="w-5 h-5" /> : <Eye className="w-5 h-5" />}
+                </button>
+              </div>
             </div>
-          </div>
+          )}
 
           <Button 
             type="submit" 
             className="w-full h-12 text-base font-semibold"
             disabled={isLoading || isGoogleLoading}
           >
-            {isLoading ? 'Please wait...' : mode === 'signin' ? 'Sign In' : 'Create Account'}
+            {isLoading 
+              ? 'Please wait...' 
+              : mode === 'forgot' 
+                ? 'Send Reset Link' 
+                : mode === 'signin' 
+                  ? 'Sign In' 
+                  : 'Create Account'}
           </Button>
         </motion.form>
 
-        {/* Divider */}
-        <div className="flex items-center gap-4 my-6">
-          <Separator className="flex-1" />
-          <span className="text-sm text-muted-foreground">or</span>
-          <Separator className="flex-1" />
-        </div>
+        {mode !== 'forgot' && (
+          <>
+            {/* Divider */}
+            <div className="flex items-center gap-4 my-6">
+              <Separator className="flex-1" />
+              <span className="text-sm text-muted-foreground">or</span>
+              <Separator className="flex-1" />
+            </div>
 
-        {/* Google Sign In */}
-        <motion.div
-          initial={{ y: 20, opacity: 0 }}
-          animate={{ y: 0, opacity: 1 }}
-          transition={{ delay: 0.15 }}
-        >
-          <Button
-            variant="outline"
-            className="w-full h-12 text-base font-medium"
-            onClick={handleGoogleSignIn}
-            disabled={isLoading || isGoogleLoading}
-          >
-            {isGoogleLoading ? (
-              'Connecting...'
-            ) : (
-              <>
-                <GoogleIcon />
-                <span className="ml-2">Continue with Google</span>
-              </>
-            )}
-          </Button>
-        </motion.div>
+            {/* Google Sign In */}
+            <motion.div
+              initial={{ y: 20, opacity: 0 }}
+              animate={{ y: 0, opacity: 1 }}
+              transition={{ delay: 0.15 }}
+            >
+              <Button
+                variant="outline"
+                className="w-full h-12 text-base font-medium"
+                onClick={handleGoogleSignIn}
+                disabled={isLoading || isGoogleLoading}
+              >
+                {isGoogleLoading ? (
+                  'Connecting...'
+                ) : (
+                  <>
+                    <GoogleIcon />
+                    <span className="ml-2">Continue with Google</span>
+                  </>
+                )}
+              </Button>
+            </motion.div>
+          </>
+        )}
 
         {/* Toggle mode */}
         <motion.div 
@@ -245,15 +353,27 @@ const AuthPage = () => {
           transition={{ delay: 0.2 }}
           className="mt-6 text-center"
         >
-          <p className="text-muted-foreground">
-            {mode === 'signin' ? "Don't have an account?" : 'Already have an account?'}
-            <button
-              onClick={() => setMode(mode === 'signin' ? 'signup' : 'signin')}
-              className="text-primary font-medium ml-1 hover:underline"
-            >
-              {mode === 'signin' ? 'Sign Up' : 'Sign In'}
-            </button>
-          </p>
+          {mode === 'forgot' ? (
+            <p className="text-muted-foreground">
+              Remember your password?
+              <button
+                onClick={() => setMode('signin')}
+                className="text-primary font-medium ml-1 hover:underline"
+              >
+                Sign In
+              </button>
+            </p>
+          ) : (
+            <p className="text-muted-foreground">
+              {mode === 'signin' ? "Don't have an account?" : 'Already have an account?'}
+              <button
+                onClick={() => setMode(mode === 'signin' ? 'signup' : 'signin')}
+                className="text-primary font-medium ml-1 hover:underline"
+              >
+                {mode === 'signin' ? 'Sign Up' : 'Sign In'}
+              </button>
+            </p>
+          )}
         </motion.div>
       </div>
     </div>
