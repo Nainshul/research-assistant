@@ -107,10 +107,10 @@ const AuthPage = () => {
           });
         } else {
           toast({
-            title: 'Welcome to Crop-Doc!',
-            description: 'Your account has been created successfully.',
+            title: 'Account created!',
+            description: 'Please check your email to verify your account.',
           });
-          navigate('/');
+          navigate('/verify-email');
         }
       } else {
         const { error } = await signIn(formData.email, formData.password);

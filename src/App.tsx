@@ -6,12 +6,14 @@ import { BrowserRouter, Routes, Route } from "react-router-dom";
 import { AuthProvider } from "@/contexts/AuthContext";
 import { LanguageProvider } from "@/contexts/LanguageContext";
 import OfflineIndicator from "@/components/OfflineIndicator";
+import RequireVerifiedEmail from "@/components/auth/RequireVerifiedEmail";
 import Index from "./pages/Index";
 import ScanPage from "./pages/ScanPage";
 import CommunityPage from "./pages/CommunityPage";
 import ProfilePage from "./pages/ProfilePage";
 import AuthPage from "./pages/AuthPage";
 import ResetPasswordPage from "./pages/ResetPasswordPage";
+import VerifyEmailPage from "./pages/VerifyEmailPage";
 import HistoryPage from "./pages/HistoryPage";
 import SettingsPage from "./pages/SettingsPage";
 import NotFound from "./pages/NotFound";
@@ -30,12 +32,25 @@ const App = () => (
             <Routes>
               <Route path="/" element={<Index />} />
               <Route path="/scan" element={<ScanPage />} />
-              <Route path="/community" element={<CommunityPage />} />
+              <Route path="/community" element={
+                <RequireVerifiedEmail>
+                  <CommunityPage />
+                </RequireVerifiedEmail>
+              } />
               <Route path="/profile" element={<ProfilePage />} />
               <Route path="/auth" element={<AuthPage />} />
               <Route path="/reset-password" element={<ResetPasswordPage />} />
-              <Route path="/history" element={<HistoryPage />} />
-              <Route path="/settings" element={<SettingsPage />} />
+              <Route path="/verify-email" element={<VerifyEmailPage />} />
+              <Route path="/history" element={
+                <RequireVerifiedEmail>
+                  <HistoryPage />
+                </RequireVerifiedEmail>
+              } />
+              <Route path="/settings" element={
+                <RequireVerifiedEmail>
+                  <SettingsPage />
+                </RequireVerifiedEmail>
+              } />
               {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
               <Route path="*" element={<NotFound />} />
             </Routes>
