@@ -13,6 +13,7 @@ interface AuthContextType {
   signOut: () => Promise<void>;
   resetPassword: (email: string) => Promise<{ error: Error | null }>;
   updatePassword: (newPassword: string) => Promise<{ error: Error | null }>;
+  updateEmail: (newEmail: string) => Promise<{ error: Error | null }>;
   resendVerificationEmail: (email: string) => Promise<{ error: Error | null }>;
 }
 
@@ -95,6 +96,15 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
     return { error: error as Error | null };
   };
 
+  const updateEmail = async (newEmail: string) => {
+    const { error } = await supabase.auth.updateUser({
+      email: newEmail,
+    }, {
+      emailRedirectTo: `${window.location.origin}/verify-email`,
+    });
+    return { error: error as Error | null };
+  };
+
   const resendVerificationEmail = async (email: string) => {
     const { error } = await supabase.auth.resend({
       type: 'signup',
@@ -118,6 +128,7 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
       signOut, 
       resetPassword, 
       updatePassword,
+      updateEmail,
       resendVerificationEmail 
     }}>
       {children}
