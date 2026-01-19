@@ -7,6 +7,7 @@ interface AuthContextType {
   session: Session | null;
   isLoading: boolean;
   isEmailVerified: boolean;
+  linkedProviders: string[];
   signUp: (email: string, password: string, fullName?: string) => Promise<{ error: Error | null }>;
   signIn: (email: string, password: string) => Promise<{ error: Error | null }>;
   signInWithProvider: (provider: Provider) => Promise<{ error: Error | null }>;
@@ -15,6 +16,8 @@ interface AuthContextType {
   updatePassword: (newPassword: string) => Promise<{ error: Error | null }>;
   updateEmail: (newEmail: string) => Promise<{ error: Error | null }>;
   resendVerificationEmail: (email: string) => Promise<{ error: Error | null }>;
+  linkProvider: (provider: Provider) => Promise<{ error: Error | null }>;
+  unlinkProvider: (provider: Provider) => Promise<{ error: Error | null }>;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -25,6 +28,9 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
   const [isLoading, setIsLoading] = useState(true);
 
   const isEmailVerified = Boolean(user?.email_confirmed_at);
+
+  // Get linked identity providers
+  const linkedProviders = user?.identities?.map(identity => identity.provider) || [];
 
   useEffect(() => {
     // Set up auth state listener BEFORE getting session
@@ -116,12 +122,32 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
     return { error: error as Error | null };
   };
 
+  const linkProvider = async (provider: Provider) => {
+    const { error } = await supabase.auth.linkIdentity({
+      provider,
+      options: {
+        redirectTo: `${window.location.origin}/settings`,
+      },
+    });
+    return { error: error as Error | null };
+  };
+
+  const unlinkProvider = async (provider: Provider) => {
+    const identity = user?.identities?.find(i => i.provider === provider);
+    if (!identity) {
+      return { error: new Error('Provider not linked') };
+    }
+    const { error } = await supabase.auth.unlinkIdentity(identity);
+    return { error: error as Error | null };
+  };
+
   return (
     <AuthContext.Provider value={{ 
       user, 
       session, 
       isLoading, 
       isEmailVerified,
+      linkedProviders,
       signUp, 
       signIn, 
       signInWithProvider, 
@@ -129,7 +155,9 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
       resetPassword, 
       updatePassword,
       updateEmail,
-      resendVerificationEmail 
+      resendVerificationEmail,
+      linkProvider,
+      unlinkProvider,
     }}>
       {children}
     </AuthContext.Provider>
