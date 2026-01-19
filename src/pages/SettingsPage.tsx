@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import AppLayout from '@/components/layout/AppLayout';
-import { ArrowLeft, Save, Loader2, Globe, Mail, CheckCircle, AlertCircle } from 'lucide-react';
+import { ArrowLeft, Save, Loader2, Globe, Mail, CheckCircle, AlertCircle, Lock } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -21,7 +21,7 @@ interface ProfileData {
 
 const SettingsPage = () => {
   const navigate = useNavigate();
-  const { user, isLoading: authLoading, isEmailVerified, updateEmail } = useAuth();
+  const { user, isLoading: authLoading, isEmailVerified, updateEmail, updatePassword } = useAuth();
   const { language, setLanguage, t, languages } = useLanguage();
   const [profile, setProfile] = useState<ProfileData>({
     full_name: '',
@@ -29,8 +29,12 @@ const SettingsPage = () => {
     location_district: '',
   });
   const [newEmail, setNewEmail] = useState('');
+  const [currentPassword, setCurrentPassword] = useState('');
+  const [newPassword, setNewPassword] = useState('');
+  const [confirmPassword, setConfirmPassword] = useState('');
   const [isLoading, setIsLoading] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
+  const [isChangingPassword, setIsChangingPassword] = useState(false);
   const [isChangingEmail, setIsChangingEmail] = useState(false);
 
   useEffect(() => {
@@ -113,6 +117,40 @@ const SettingsPage = () => {
       toast.error('Failed to update email');
     } finally {
       setIsChangingEmail(false);
+    }
+  };
+
+  const handlePasswordChange = async () => {
+    if (!newPassword || !confirmPassword) {
+      toast.error('Please fill in all password fields');
+      return;
+    }
+
+    if (newPassword !== confirmPassword) {
+      toast.error('Passwords do not match');
+      return;
+    }
+
+    if (newPassword.length < 6) {
+      toast.error('Password must be at least 6 characters');
+      return;
+    }
+
+    setIsChangingPassword(true);
+    try {
+      const { error } = await updatePassword(newPassword);
+      if (error) {
+        toast.error(error.message);
+      } else {
+        toast.success('Password updated successfully');
+        setCurrentPassword('');
+        setNewPassword('');
+        setConfirmPassword('');
+      }
+    } catch (error) {
+      toast.error('Failed to update password');
+    } finally {
+      setIsChangingPassword(false);
     }
   };
 
@@ -215,6 +253,61 @@ const SettingsPage = () => {
               </div>
             )}
           </div>
+
+          <Separator />
+
+          {/* Password Section */}
+          {!isOAuthUser && (
+            <div className="space-y-4">
+              <div className="flex items-center gap-2">
+                <Lock className="w-4 h-4 text-muted-foreground" />
+                <Label className="text-base font-semibold">Change Password</Label>
+              </div>
+              
+              <div className="space-y-3">
+                <div className="space-y-2">
+                  <Label htmlFor="new_password">New Password</Label>
+                  <Input
+                    id="new_password"
+                    type="password"
+                    placeholder="Enter new password"
+                    value={newPassword}
+                    onChange={(e) => setNewPassword(e.target.value)}
+                  />
+                </div>
+                
+                <div className="space-y-2">
+                  <Label htmlFor="confirm_password">Confirm New Password</Label>
+                  <Input
+                    id="confirm_password"
+                    type="password"
+                    placeholder="Confirm new password"
+                    value={confirmPassword}
+                    onChange={(e) => setConfirmPassword(e.target.value)}
+                  />
+                </div>
+
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={handlePasswordChange}
+                  disabled={isChangingPassword || !newPassword || !confirmPassword}
+                >
+                  {isChangingPassword ? (
+                    <>
+                      <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                      Updating...
+                    </>
+                  ) : (
+                    'Update Password'
+                  )}
+                </Button>
+                <p className="text-xs text-muted-foreground">
+                  Password must be at least 6 characters long.
+                </p>
+              </div>
+            </div>
+          )}
 
           <Separator />
 
