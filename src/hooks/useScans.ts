@@ -1,5 +1,7 @@
 import { useState, useEffect } from 'react';
-import { supabase } from '@/integrations/supabase/client';
+import { db, storage } from '@/lib/firebase';
+import { collection, query, where, getDocs, addDoc, deleteDoc, orderBy, doc, Timestamp } from 'firebase/firestore';
+import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
 import { useAuth } from '@/contexts/AuthContext';
 import { useToast } from '@/hooks/use-toast';
 
@@ -29,13 +31,30 @@ export const useScans = () => {
     }
 
     try {
-      const { data, error } = await supabase
-        .from('scans')
-        .select('*')
-        .order('created_at', { ascending: false });
+      const q = query(
+        collection(db, 'scans'),
+        where('user_id', '==', user.uid),
+        orderBy('created_at', 'desc')
+      );
 
-      if (error) throw error;
-      setScans(data || []);
+      const querySnapshot = await getDocs(q);
+      const fetchedScans: Scan[] = [];
+      querySnapshot.forEach((doc) => {
+        const data = doc.data();
+        fetchedScans.push({
+          id: doc.id,
+          user_id: data.user_id,
+          image_url: data.image_url,
+          disease_detected: data.disease_detected,
+          crop_name: data.crop_name,
+          confidence_score: data.confidence_score,
+          geo_lat: data.geo_lat,
+          geo_long: data.geo_long,
+          created_at: data.created_at, // Assuming stored as ISO string or timestamp converted to string
+        });
+      });
+
+      setScans(fetchedScans);
     } catch (error) {
       console.error('Error fetching scans:', error);
     } finally {
@@ -54,22 +73,13 @@ export const useScans = () => {
       // Convert data URL to blob
       const response = await fetch(imageDataUrl);
       const blob = await response.blob();
-      
+
       // Generate unique filename
-      const fileName = `${user.id}/${Date.now()}.jpg`;
-      
-      const { data, error } = await supabase.storage
-        .from('scan-images')
-        .upload(fileName, blob, {
-          contentType: 'image/jpeg',
-        });
+      const fileName = `${user.uid}/${Date.now()}.jpg`;
+      const storageRef = ref(storage, `scan-images/${fileName}`);
 
-      if (error) throw error;
-
-      // Get public URL
-      const { data: { publicUrl } } = supabase.storage
-        .from('scan-images')
-        .getPublicUrl(data.path);
+      await uploadBytes(storageRef, blob);
+      const publicUrl = await getDownloadURL(storageRef);
 
       return publicUrl;
     } catch (error) {
@@ -95,7 +105,7 @@ export const useScans = () => {
       // Try to get geolocation
       let geoLat: number | null = null;
       let geoLong: number | null = null;
-      
+
       if (navigator.geolocation) {
         try {
           const position = await new Promise<GeolocationPosition>((resolve, reject) => {
@@ -108,31 +118,33 @@ export const useScans = () => {
         }
       }
 
-      const { data, error } = await supabase
-        .from('scans')
-        .insert({
-          user_id: user.id,
-          image_url: imageUrl,
-          disease_detected: diseaseDetected,
-          crop_name: cropName,
-          confidence_score: confidenceScore,
-          geo_lat: geoLat,
-          geo_long: geoLong,
-        })
-        .select()
-        .single();
+      const scanData = {
+        user_id: user.uid,
+        image_url: imageUrl,
+        disease_detected: diseaseDetected,
+        crop_name: cropName,
+        confidence_score: confidenceScore,
+        geo_lat: geoLat,
+        geo_long: geoLong,
+        created_at: new Date().toISOString(),
+      };
 
-      if (error) throw error;
+      const docRef = await addDoc(collection(db, 'scans'), scanData);
+
+      const newScan: Scan = {
+        id: docRef.id,
+        ...scanData
+      };
 
       // Update local state
-      setScans(prev => [data, ...prev]);
-      
+      setScans(prev => [newScan, ...prev]);
+
       toast({
         title: 'Scan saved',
         description: 'Your diagnosis has been saved to your history',
       });
 
-      return data;
+      return newScan;
     } catch (error) {
       console.error('Error saving scan:', error);
       toast({
@@ -146,15 +158,10 @@ export const useScans = () => {
 
   const deleteScan = async (scanId: string) => {
     try {
-      const { error } = await supabase
-        .from('scans')
-        .delete()
-        .eq('id', scanId);
-
-      if (error) throw error;
+      await deleteDoc(doc(db, 'scans', scanId));
 
       setScans(prev => prev.filter(s => s.id !== scanId));
-      
+
       toast({
         title: 'Scan deleted',
         description: 'The scan has been removed from your history',

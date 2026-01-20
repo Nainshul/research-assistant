@@ -1,5 +1,7 @@
 import { useState, useEffect, useCallback } from 'react';
-import { supabase } from '@/integrations/supabase/client';
+import { db, storage } from '@/lib/firebase';
+import { collection, addDoc } from 'firebase/firestore';
+import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
 import { useAuth } from '@/contexts/AuthContext';
 
 interface PendingScan {
@@ -79,7 +81,7 @@ export const useOfflineSync = () => {
     return response.blob();
   };
 
-  // Sync all pending scans to Supabase
+  // Sync all pending scans to Firebase
   const syncPendingScans = useCallback(async () => {
     if (!user || !isOnline || pendingScans.length === 0 || isSyncing) {
       return { synced: 0, failed: 0 };
@@ -93,35 +95,21 @@ export const useOfflineSync = () => {
       try {
         // Upload image to storage
         const blob = await dataUrlToBlob(scan.imageDataUrl);
-        const fileName = `${user.id}/${Date.now()}-${scan.id}.jpg`;
-        
-        const { error: uploadError } = await supabase.storage
-          .from('scan-images')
-          .upload(fileName, blob, {
-            contentType: 'image/jpeg',
-            upsert: false,
-          });
+        const fileName = `${user.uid}/${Date.now()}-${scan.id}.jpg`;
+        const storageRef = ref(storage, `scan-images/${fileName}`);
 
-        if (uploadError) throw uploadError;
-
-        // Get public URL
-        const { data: { publicUrl } } = supabase.storage
-          .from('scan-images')
-          .getPublicUrl(fileName);
+        await uploadBytes(storageRef, blob);
+        const publicUrl = await getDownloadURL(storageRef);
 
         // Save scan to database
-        const { error: insertError } = await supabase
-          .from('scans')
-          .insert({
-            user_id: user.id,
-            image_url: publicUrl,
-            disease_detected: scan.diseaseName,
-            crop_name: scan.cropName,
-            confidence_score: scan.confidence,
-            created_at: scan.createdAt,
-          });
-
-        if (insertError) throw insertError;
+        await addDoc(collection(db, 'scans'), {
+          user_id: user.uid,
+          image_url: publicUrl,
+          disease_detected: scan.diseaseName,
+          crop_name: scan.cropName,
+          confidence_score: scan.confidence,
+          created_at: scan.createdAt,
+        });
 
         // Remove from pending queue on success
         removePendingScan(scan.id);

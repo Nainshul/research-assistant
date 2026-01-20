@@ -5,7 +5,6 @@ import { Mail, CheckCircle, RefreshCw, ArrowLeft } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { useAuth } from '@/contexts/AuthContext';
 import { useToast } from '@/hooks/use-toast';
-import { supabase } from '@/integrations/supabase/client';
 
 const VerifyEmailPage = () => {
   const navigate = useNavigate();
@@ -15,37 +14,24 @@ const VerifyEmailPage = () => {
   const [isResending, setIsResending] = useState(false);
   const [isVerified, setIsVerified] = useState(false);
 
-  // Check if user came from email verification link
+  // Check verification status from Auth Context
   useEffect(() => {
-    const checkVerification = async () => {
-      // If there's a token in the URL, Supabase will handle it automatically
-      const { data: { session } } = await supabase.auth.getSession();
-      if (session?.user?.email_confirmed_at) {
-        setIsVerified(true);
-        toast({
-          title: 'Email verified!',
-          description: 'Your email has been verified successfully.',
-        });
-        setTimeout(() => navigate('/'), 2000);
-      }
-    };
-    
-    checkVerification();
-  }, [navigate, toast, searchParams]);
-
-  // Redirect if already verified
-  useEffect(() => {
-    if (user?.email_confirmed_at) {
-      navigate('/');
+    if (user?.emailVerified) {
+      setIsVerified(true);
+      toast({
+        title: 'Email verified!',
+        description: 'Your email has been verified successfully.',
+      });
+      setTimeout(() => navigate('/'), 2000);
     }
-  }, [user, navigate]);
+  }, [user, navigate, toast]);
 
   const handleResendEmail = async () => {
-    if (!user?.email) return;
-    
+    // if (!user?.email) return; // User might be null if page refreshed, but normally we are in an auth flow
+
     setIsResending(true);
     try {
-      const { error } = await resendVerificationEmail(user.email);
+      const { error } = await resendVerificationEmail();
       if (error) {
         toast({
           title: 'Failed to resend',
@@ -85,7 +71,7 @@ const VerifyEmailPage = () => {
     <div className="min-h-screen bg-background max-w-[430px] mx-auto">
       {/* Header */}
       <div className="p-4 flex items-center gap-4">
-        <button 
+        <button
           onClick={() => navigate('/auth')}
           className="touch-target w-10 h-10 flex items-center justify-center rounded-full bg-muted"
         >

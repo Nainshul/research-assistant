@@ -1,5 +1,6 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { supabase } from '@/integrations/supabase/client';
+import { db } from '@/lib/firebase';
+import { collection, query, orderBy, getDocs, addDoc, where, doc, deleteDoc, getDoc } from 'firebase/firestore';
 import { useAuth } from '@/contexts/AuthContext';
 import { toast } from '@/hooks/use-toast';
 
@@ -36,65 +37,63 @@ export const useForum = () => {
     queryKey: ['forum-posts'],
     queryFn: async () => {
       // Fetch posts
-      const { data: posts, error } = await supabase
-        .from('forum_posts')
-        .select('*')
-        .order('created_at', { ascending: false });
+      const postsRef = collection(db, 'posts');
+      const q = query(postsRef, orderBy('created_at', 'desc'));
+      const snapshot = await getDocs(q);
 
-      if (error) throw error;
+      const posts = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as ForumPost));
 
-      // Fetch all unique user_ids and get their profiles
-      const userIds = [...new Set((posts || []).map(p => p.user_id))];
-      const { data: profiles } = await supabase
-        .from('profiles')
-        .select('user_id, full_name')
-        .in('user_id', userIds);
+      // Fetch additional data (likes, comments, profiles)
+      // Note: Firestore doesn't support joins. Optimized way is to store counts on post doc.
+      // For now, doing separate queries (inefficient but compatible).
 
-      const profileMap = new Map(profiles?.map(p => [p.user_id, p.full_name]) || []);
-
-      // Get likes and comments counts
       const postsWithCounts = await Promise.all(
-        (posts || []).map(async (post) => {
-          const [likesResult, commentsResult, userLikeResult] = await Promise.all([
-            supabase.from('forum_likes').select('id', { count: 'exact' }).eq('post_id', post.id),
-            supabase.from('forum_comments').select('id', { count: 'exact' }).eq('post_id', post.id),
-            user 
-              ? supabase.from('forum_likes').select('id').eq('post_id', post.id).eq('user_id', user.id).maybeSingle()
-              : Promise.resolve({ data: null })
-          ]);
+        posts.map(async (post) => {
+          // Likes count
+          const likesSnapshot = await getDocs(query(collection(db, 'likes'), where('post_id', '==', post.id)));
+          const commentsSnapshot = await getDocs(query(collection(db, 'comments'), where('post_id', '==', post.id)));
+
+          let userHasLiked = false;
+          if (user) {
+            const userLike = likesSnapshot.docs.find(d => d.data().user_id === user.uid);
+            userHasLiked = !!userLike;
+          }
+
+          // Author Name often stored in post or fetched from users collection. 
+          // Assuming stored in post for now or falling back to 'User'
+          const author_name = post.author_name || 'User';
 
           return {
             ...post,
-            author_name: profileMap.get(post.user_id) || null,
-            likes_count: likesResult.count || 0,
-            comments_count: commentsResult.count || 0,
-            user_has_liked: !!userLikeResult.data
+            author_name,
+            likes_count: likesSnapshot.size,
+            comments_count: commentsSnapshot.size,
+            user_has_liked: userHasLiked
           };
         })
       );
 
-      return postsWithCounts as ForumPost[];
+      return postsWithCounts;
     }
   });
 
   const createPostMutation = useMutation({
     mutationFn: async (post: { title: string; content: string; image_url?: string; crop_type?: string }) => {
       if (!user) throw new Error('Must be logged in');
-      
-      const { data, error } = await supabase
-        .from('forum_posts')
-        .insert({
-          user_id: user.id,
-          title: post.title,
-          content: post.content,
-          image_url: post.image_url || null,
-          crop_type: post.crop_type || null
-        })
-        .select()
-        .single();
 
-      if (error) throw error;
-      return data;
+      const newPost = {
+        user_id: user.uid,
+        title: post.title,
+        content: post.content,
+        image_url: post.image_url || null,
+        crop_type: post.crop_type || null,
+        created_at: new Date().toISOString(),
+        updated_at: new Date().toISOString(),
+        author_name: user.displayName || user.email || 'User' // Denormalize author name
+      };
+
+      const docRef = await addDoc(collection(db, 'posts'), newPost);
+      return { id: docRef.id, ...newPost };
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['forum-posts'] });
@@ -109,18 +108,20 @@ export const useForum = () => {
     mutationFn: async ({ postId, hasLiked }: { postId: string; hasLiked: boolean }) => {
       if (!user) throw new Error('Must be logged in');
 
+      const likesRef = collection(db, 'likes');
+      const q = query(likesRef, where('post_id', '==', postId), where('user_id', '==', user.uid));
+      const snapshot = await getDocs(q);
+
       if (hasLiked) {
-        const { error } = await supabase
-          .from('forum_likes')
-          .delete()
-          .eq('post_id', postId)
-          .eq('user_id', user.id);
-        if (error) throw error;
+        // Unlike
+        snapshot.forEach(async (d) => {
+          await deleteDoc(doc(db, 'likes', d.id));
+        });
       } else {
-        const { error } = await supabase
-          .from('forum_likes')
-          .insert({ post_id: postId, user_id: user.id });
-        if (error) throw error;
+        // Like
+        if (snapshot.empty) {
+          await addDoc(likesRef, { post_id: postId, user_id: user.uid, created_at: new Date().toISOString() });
+        }
       }
     },
     onSuccess: () => {
@@ -144,27 +145,10 @@ export const useForumComments = (postId: string) => {
   const commentsQuery = useQuery({
     queryKey: ['forum-comments', postId],
     queryFn: async () => {
-      const { data: comments, error } = await supabase
-        .from('forum_comments')
-        .select('*')
-        .eq('post_id', postId)
-        .order('created_at', { ascending: true });
+      const q = query(collection(db, 'comments'), where('post_id', '==', postId), orderBy('created_at', 'asc'));
+      const snapshot = await getDocs(q);
 
-      if (error) throw error;
-
-      // Fetch profiles for comment authors
-      const userIds = [...new Set((comments || []).map(c => c.user_id))];
-      const { data: profiles } = await supabase
-        .from('profiles')
-        .select('user_id, full_name')
-        .in('user_id', userIds);
-
-      const profileMap = new Map(profiles?.map(p => [p.user_id, p.full_name]) || []);
-
-      return (comments || []).map(comment => ({
-        ...comment,
-        author_name: profileMap.get(comment.user_id) || null
-      })) as ForumComment[];
+      return snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as ForumComment));
     }
   });
 
@@ -172,18 +156,17 @@ export const useForumComments = (postId: string) => {
     mutationFn: async (content: string) => {
       if (!user) throw new Error('Must be logged in');
 
-      const { data, error } = await supabase
-        .from('forum_comments')
-        .insert({
-          post_id: postId,
-          user_id: user.id,
-          content
-        })
-        .select()
-        .single();
+      const newComment = {
+        post_id: postId,
+        user_id: user.uid,
+        content,
+        created_at: new Date().toISOString(),
+        author_name: user.displayName || user.email || 'User',
+        is_expert_answer: false
+      };
 
-      if (error) throw error;
-      return data;
+      const docRef = await addDoc(collection(db, 'comments'), newComment);
+      return { id: docRef.id, ...newComment };
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['forum-comments', postId] });

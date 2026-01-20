@@ -1,6 +1,7 @@
 import { createContext, useContext, useState, useEffect, ReactNode } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
-import { supabase } from '@/integrations/supabase/client';
+import { db } from '@/lib/firebase';
+import { doc, getDoc, setDoc } from 'firebase/firestore';
 
 export type Language = 'en' | 'hi' | 'ta' | 'te' | 'kn' | 'mr';
 
@@ -31,7 +32,7 @@ const translations: Record<Language, Record<string, string>> = {
     save: 'Save Changes',
     saving: 'Saving...',
     cancel: 'Cancel',
-    
+
     // Profile
     totalScans: 'Total Scans',
     healthyPlants: 'Healthy Plants',
@@ -42,7 +43,7 @@ const translations: Record<Language, Record<string, string>> = {
     signOut: 'Sign Out',
     guestUser: 'Guest User',
     signInToSave: 'Sign in to save your scan history',
-    
+
     // Settings
     fullName: 'Full Name',
     enterFullName: 'Enter your full name',
@@ -55,7 +56,7 @@ const translations: Record<Language, Record<string, string>> = {
     profileUpdated: 'Profile updated successfully',
     failedToUpdate: 'Failed to update profile',
     failedToLoad: 'Failed to load profile',
-    
+
     // Scan
     scanYourPlant: 'Scan Your Plant',
     takePhoto: 'Take a photo of your plant leaf',
@@ -63,7 +64,7 @@ const translations: Record<Language, Record<string, string>> = {
     result: 'Result',
     confidence: 'Confidence',
     healthy: 'Healthy',
-    
+
     // Auth
     welcomeBack: 'Welcome back',
     createAccount: 'Create an account',
@@ -319,20 +320,26 @@ export const LanguageProvider = ({ children }: { children: ReactNode }) => {
   useEffect(() => {
     const loadLanguage = async () => {
       if (user) {
-        const { data } = await supabase
-          .from('profiles')
-          .select('language_pref')
-          .eq('user_id', user.id)
-          .single();
-        
-        if (data?.language_pref && languages.some(l => l.code === data.language_pref)) {
-          setLanguageState(data.language_pref as Language);
+        try {
+          const docRef = doc(db, 'profiles', user.uid);
+          const docSnap = await getDoc(docRef);
+
+          if (docSnap.exists()) {
+            const data = docSnap.data();
+            if (data?.language_pref && languages.some(l => l.code === data.language_pref)) {
+              setLanguageState(data.language_pref as Language);
+              return;
+            }
+          }
+        } catch (e) {
+          console.error("Failed to load language pref", e);
         }
-      } else {
-        const stored = localStorage.getItem('language_pref');
-        if (stored && languages.some(l => l.code === stored)) {
-          setLanguageState(stored as Language);
-        }
+      }
+
+      // Fallback to local storage
+      const stored = localStorage.getItem('language_pref');
+      if (stored && languages.some(l => l.code === stored)) {
+        setLanguageState(stored as Language);
       }
     };
     loadLanguage();
@@ -341,12 +348,14 @@ export const LanguageProvider = ({ children }: { children: ReactNode }) => {
   const setLanguage = async (lang: Language) => {
     setLanguageState(lang);
     localStorage.setItem('language_pref', lang);
-    
+
     if (user) {
-      await supabase
-        .from('profiles')
-        .update({ language_pref: lang })
-        .eq('user_id', user.id);
+      try {
+        const docRef = doc(db, 'profiles', user.uid);
+        await setDoc(docRef, { language_pref: lang }, { merge: true });
+      } catch (e) {
+        console.error("Failed to save language pref", e);
+      }
     }
   };
 
