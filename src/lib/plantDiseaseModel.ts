@@ -1,10 +1,10 @@
 import * as tf from '@tensorflow/tfjs';
 
-// YOLOv8 models typically use 640x640 input
-const MODEL_INPUT_SIZE = 640;
+// MobileNetV2 model typically uses 224x224 input
+const MODEL_INPUT_SIZE = 224;
 
-// Placeholder for YOLOv8 Classification classes.
-// You MUST replace this with the actual classes from your trained YOLOv8 model.
+// Placeholder for Class names.
+// These match the 38 classes of the PlantVillage dataset used by the model below.
 export const PLANT_DISEASE_CLASSES = [
   'Apple___Apple_scab',
   'Apple___Black_rot',
@@ -48,30 +48,30 @@ export const PLANT_DISEASE_CLASSES = [
 
 export type PlantDiseaseClass = typeof PLANT_DISEASE_CLASSES[number];
 
-// Placeholder URL - User needs to provide their own YOLOv8 TF.js export
-// Hosted example or local path (e.g., '/models/yolov8n-cls/model.json')
-const MODEL_URL = 'https://raw.githubusercontent.com/hyaka/plant-disease-classification-tfjs/main/model/model.json'; // Reverting to a known working model for demo purposes as YOLOv8 URL is not provided.
+// Using a pre-trained MobileNetV2 model on PlantVillage dataset (38 classes)
+// Source: https://github.com/rexsimiloluwah/PLANT-DISEASE-CLASSIFIER-WEB-APP-TENSORFLOWJS
+const MODEL_URL = 'https://raw.githubusercontent.com/rexsimiloluwah/PLANT-DISEASE-CLASSIFIER-WEB-APP-TENSORFLOWJS/master/tensorflowjs-model/model.json';
 
 let model: tf.GraphModel | tf.LayersModel | null = null;
 let isModelLoading = false;
 let modelLoadError: string | null = null;
 
 /**
- * Preprocess image for YOLOv8 inference
- * Resizes to 640x640 and normalizes pixel values [0, 1]
+ * Preprocess image for MobileNetV2 inference
+ * Resizes to 224x224 and normalizes pixel values [0, 1]
  */
 export const preprocessImage = async (imageElement: HTMLImageElement | HTMLCanvasElement): Promise<tf.Tensor4D> => {
   return tf.tidy(() => {
     // Convert image to tensor
     let tensor = tf.browser.fromPixels(imageElement);
 
-    // Resize to model input size (640x640 for YOLOv8)
+    // Resize to model input size (224x224)
     tensor = tf.image.resizeBilinear(tensor, [MODEL_INPUT_SIZE, MODEL_INPUT_SIZE]);
 
     // Normalize pixel values to [0, 1]
     const normalized = tensor.div(255.0);
 
-    // Add batch dimension: [640, 640, 3] -> [1, 640, 640, 3]
+    // Add batch dimension: [224, 224, 3] -> [1, 224, 224, 3]
     return normalized.expandDims(0) as tf.Tensor4D;
   });
 };
@@ -107,14 +107,14 @@ export const loadModel = async (): Promise<void> => {
   try {
     console.log('Loading AI model...');
 
-    // Try loading as GraphModel first (common for TF.js exports)
+    // This specific model is a LayersModel
     try {
-      model = await tf.loadGraphModel(MODEL_URL);
-      console.log('GraphModel loaded successfully');
-    } catch (e) {
-      console.log('GraphModel failed, trying LayersModel...', e);
       model = await tf.loadLayersModel(MODEL_URL);
       console.log('LayersModel loaded successfully');
+    } catch (e) {
+      console.log('LayersModel failed, trying GraphModel...', e);
+      model = await tf.loadGraphModel(MODEL_URL);
+      console.log('GraphModel loaded successfully');
     }
 
     // Warm up
