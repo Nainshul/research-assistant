@@ -1,5 +1,4 @@
 import * as tf from '@tensorflow/tfjs';
-import * as cocoSsd from '@tensorflow-models/coco-ssd';
 
 // MobileNetV2 model typically uses 224x224 input
 const MODEL_INPUT_SIZE = 224;
@@ -54,7 +53,6 @@ export type PlantDiseaseClass = typeof PLANT_DISEASE_CLASSES[number];
 const MODEL_URL = 'https://raw.githubusercontent.com/rexsimiloluwah/PLANT-DISEASE-CLASSIFIER-WEB-APP-TENSORFLOWJS/master/tensorflowjs-model/model.json';
 
 let model: tf.GraphModel | tf.LayersModel | null = null;
-let objectModel: cocoSsd.ObjectDetection | null = null;
 let isModelLoading = false;
 let modelLoadError: string | null = null;
 
@@ -102,7 +100,7 @@ export const getModelStatus = (): { loading: boolean; error: string | null; read
 };
 
 export const loadModel = async (): Promise<void> => {
-  if ((model && objectModel) || isModelLoading) return;
+  if (model || isModelLoading) return;
 
   isModelLoading = true;
   modelLoadError = null;
@@ -110,16 +108,7 @@ export const loadModel = async (): Promise<void> => {
   try {
     console.log('Loading AI models...');
 
-    // Load Object Detection Model (COCO-SSD)
-    try {
-      if (!objectModel) {
-        objectModel = await cocoSsd.load();
-        console.log('Object detection model loaded successfully');
-      }
-    } catch (e) {
-      console.warn('Failed to load object detection model:', e);
-      // We continue even if object detection fails, but validation won't work
-    }
+    // Object Detection Model (COCO-SSD) removed for performance
 
     // This specific model is a LayersModel
     if (!model) {
@@ -157,7 +146,6 @@ export const loadModel = async (): Promise<void> => {
     console.error('Model loading error:', message);
     modelLoadError = message;
     model = null;
-    objectModel = null;
   } finally {
     isModelLoading = false;
   }
@@ -173,35 +161,8 @@ export const predictDisease = async (
 
   const imgElement = await loadImageFromDataUrl(imageDataUrl);
 
-  // 1. Run Object Detection first to validate if it's a crop/plant
-  if (objectModel) {
-    const detections = await objectModel.detect(imgElement);
-    console.log('Object detections:', detections);
-
-    const forbiddenClasses = [
-      'person', 'car', 'truck', 'motorcycle', 'airplane',
-      'bus', 'train', 'boat', 'bicycle', 'dog', 'cat',
-      'horse', 'sheep', 'cow', 'elephant', 'bear', 'zebra', 'giraffe',
-      'laptop', 'tv', 'cell phone', 'microwave', 'oven', 'toaster', 'sink', 'refrigerator'
-    ];
-
-    // Check if any forbidden object is detected with significant confidence
-    // We increase threshold for people substantially because hands are often detected as 'person'
-    // and we want to allow users to hold the leaf.
-    const invalidDetection = detections.find(d => {
-      if (!forbiddenClasses.includes(d.class)) return false;
-
-      // Higher threshold for person to allow hands holding crops
-      if (d.class === 'person') return d.score > 0.75;
-
-      return d.score > 0.6;
-    });
-
-    if (invalidDetection) {
-      console.warn(`Blocked by object detection: Found ${invalidDetection.class} with score ${invalidDetection.score}`);
-      throw new Error('No crop found. Please scan a plant.');
-    }
-  }
+  // Object detection validation removed for performance and reliability
+  // resulting in faster inference times and fewer false negatives.
 
   const inputTensor = await preprocessImage(imgElement);
 

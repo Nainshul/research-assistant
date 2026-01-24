@@ -28,30 +28,16 @@ export const useDiagnosis = (): UseDiagnosisReturn => {
     try {
       let topPrediction: { className: PlantDiseaseClass; confidence: number };
 
-      if (isModelReady()) {
-        // Use real TensorFlow.js model inference
-        console.log('Running TensorFlow.js inference...');
-        const predictions = await predictDisease(imageDataUrl, 3);
-        topPrediction = predictions[0];
-        console.log('Predictions:', predictions);
-      } else {
-        // Fallback to mock if model not available
-        console.log('Model not ready, using mock diagnosis...');
-        await new Promise(resolve => setTimeout(resolve, 1500));
-
-        // Generate mock prediction
-        const mockClasses: PlantDiseaseClass[] = [
-          'Tomato___Early_blight',
-          'Tomato___Late_blight',
-          'Tomato___healthy',
-          'Potato___Early_blight',
-          'Corn_(maize)___Common_rust_',
-        ];
-        topPrediction = {
-          className: mockClasses[Math.floor(Math.random() * mockClasses.length)],
-          confidence: 0.65 + Math.random() * 0.30,
-        };
+      if (!isModelReady()) {
+        console.log('Model not ready, attempting to load...');
+        await loadModel();
       }
+
+      // Use real TensorFlow.js model inference
+      console.log('Running TensorFlow.js inference...');
+      const predictions = await predictDisease(imageDataUrl, 3);
+      topPrediction = predictions[0];
+      console.log('Predictions:', predictions);
 
       // Confidence Threshold Check
       // If confidence is too low (e.g. < 40%), we assume it's not a known crop
