@@ -1,4 +1,5 @@
 import * as tf from '@tensorflow/tfjs';
+import * as cocoSsd from '@tensorflow-models/coco-ssd';
 
 // MobileNetV2 model typically uses 224x224 input
 const MODEL_INPUT_SIZE = 224;
@@ -53,6 +54,7 @@ export type PlantDiseaseClass = typeof PLANT_DISEASE_CLASSES[number];
 const MODEL_URL = 'https://raw.githubusercontent.com/rexsimiloluwah/PLANT-DISEASE-CLASSIFIER-WEB-APP-TENSORFLOWJS/master/tensorflowjs-model/model.json';
 
 let model: tf.GraphModel | tf.LayersModel | null = null;
+let objectModel: cocoSsd.ObjectDetection | null = null;
 let isModelLoading = false;
 let modelLoadError: string | null = null;
 
@@ -68,8 +70,9 @@ export const preprocessImage = async (imageElement: HTMLImageElement | HTMLCanva
     // Resize to model input size (224x224)
     tensor = tf.image.resizeBilinear(tensor, [MODEL_INPUT_SIZE, MODEL_INPUT_SIZE]);
 
-    // Normalize pixel values to [0, 1]
-    const normalized = tensor.div(255.0);
+    // Normalize pixel values to [-1, 1] for MobileNetV2
+    // (pixel - 127.5) / 127.5
+    const normalized = tensor.toFloat().div(tf.scalar(127.5)).sub(tf.scalar(1));
 
     // Add batch dimension: [224, 224, 3] -> [1, 224, 224, 3]
     return normalized.expandDims(0) as tf.Tensor4D;
@@ -99,46 +102,62 @@ export const getModelStatus = (): { loading: boolean; error: string | null; read
 };
 
 export const loadModel = async (): Promise<void> => {
-  if (model || isModelLoading) return;
+  if ((model && objectModel) || isModelLoading) return;
 
   isModelLoading = true;
   modelLoadError = null;
 
   try {
-    console.log('Loading AI model...');
+    console.log('Loading AI models...');
+
+    // Load Object Detection Model (COCO-SSD)
+    try {
+      if (!objectModel) {
+        objectModel = await cocoSsd.load();
+        console.log('Object detection model loaded successfully');
+      }
+    } catch (e) {
+      console.warn('Failed to load object detection model:', e);
+      // We continue even if object detection fails, but validation won't work
+    }
 
     // This specific model is a LayersModel
-    try {
-      model = await tf.loadLayersModel(MODEL_URL);
-      console.log('LayersModel loaded successfully');
-    } catch (e) {
-      console.log('LayersModel failed, trying GraphModel...', e);
-      model = await tf.loadGraphModel(MODEL_URL);
-      console.log('GraphModel loaded successfully');
+    if (!model) {
+      try {
+        model = await tf.loadLayersModel(MODEL_URL);
+        console.log('LayersModel loaded successfully');
+      } catch (e) {
+        console.log('LayersModel failed, trying GraphModel...', e);
+        model = await tf.loadGraphModel(MODEL_URL);
+        console.log('GraphModel loaded successfully');
+      }
+
+      // Warm up
+      if (model) {
+        const dummyInput = tf.zeros([1, MODEL_INPUT_SIZE, MODEL_INPUT_SIZE, 3]);
+        let warmupResult: tf.Tensor | tf.Tensor[];
+        if (model instanceof tf.GraphModel) {
+          warmupResult = await model.executeAsync(dummyInput);
+        } else {
+          warmupResult = (model as tf.LayersModel).predict(dummyInput) as tf.Tensor;
+        }
+
+        if (Array.isArray(warmupResult)) {
+          warmupResult.forEach(t => t.dispose());
+        } else {
+          (warmupResult as tf.Tensor).dispose();
+        }
+        dummyInput.dispose();
+      }
     }
 
-    // Warm up
-    const dummyInput = tf.zeros([1, MODEL_INPUT_SIZE, MODEL_INPUT_SIZE, 3]);
-    let warmupResult: tf.Tensor | tf.Tensor[];
-    if (model instanceof tf.GraphModel) {
-      warmupResult = await model.executeAsync(dummyInput);
-    } else {
-      warmupResult = (model as tf.LayersModel).predict(dummyInput) as tf.Tensor;
-    }
-
-    if (Array.isArray(warmupResult)) {
-      warmupResult.forEach(t => t.dispose());
-    } else {
-      (warmupResult as tf.Tensor).dispose();
-    }
-    dummyInput.dispose();
-
-    console.log('Model warmed up and ready');
+    console.log('Models warmed up and ready');
   } catch (error) {
     const message = error instanceof Error ? error.message : 'Failed to load model';
     console.error('Model loading error:', message);
     modelLoadError = message;
     model = null;
+    objectModel = null;
   } finally {
     isModelLoading = false;
   }
@@ -153,6 +172,37 @@ export const predictDisease = async (
   }
 
   const imgElement = await loadImageFromDataUrl(imageDataUrl);
+
+  // 1. Run Object Detection first to validate if it's a crop/plant
+  if (objectModel) {
+    const detections = await objectModel.detect(imgElement);
+    console.log('Object detections:', detections);
+
+    const forbiddenClasses = [
+      'person', 'car', 'truck', 'motorcycle', 'airplane',
+      'bus', 'train', 'boat', 'bicycle', 'dog', 'cat',
+      'horse', 'sheep', 'cow', 'elephant', 'bear', 'zebra', 'giraffe',
+      'laptop', 'tv', 'cell phone', 'microwave', 'oven', 'toaster', 'sink', 'refrigerator'
+    ];
+
+    // Check if any forbidden object is detected with significant confidence
+    // We increase threshold for people substantially because hands are often detected as 'person'
+    // and we want to allow users to hold the leaf.
+    const invalidDetection = detections.find(d => {
+      if (!forbiddenClasses.includes(d.class)) return false;
+
+      // Higher threshold for person to allow hands holding crops
+      if (d.class === 'person') return d.score > 0.75;
+
+      return d.score > 0.6;
+    });
+
+    if (invalidDetection) {
+      console.warn(`Blocked by object detection: Found ${invalidDetection.class} with score ${invalidDetection.score}`);
+      throw new Error('No crop found. Please scan a plant.');
+    }
+  }
+
   const inputTensor = await preprocessImage(imgElement);
 
   try {

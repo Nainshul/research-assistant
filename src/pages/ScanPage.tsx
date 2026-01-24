@@ -20,7 +20,7 @@ type ScanState = 'camera' | 'analyzing' | 'result';
 const ScanPage = () => {
   const [scanState, setScanState] = useState<ScanState>('camera');
   const [capturedImage, setCapturedImage] = useState<string | null>(null);
-  const { isAnalyzing, result, analyzeImage, clearResult } = useDiagnosis();
+  const { isAnalyzing, result, error: diagnosisError, analyzeImage, clearResult } = useDiagnosis();
   const { isLoading: isModelLoading, isReady: isModelReady, error: modelError, loadProgress, retry } = usePlantModel();
   const { uploadImage, saveScan } = useScans();
   const { isOnline, addPendingScan } = useOfflineSync();
@@ -36,7 +36,7 @@ const ScanPage = () => {
   // Save scan to cloud when result is available and user is logged in
   const handleSaveToCloud = async () => {
     if (!result || !capturedImage || !user) return;
-    
+
     // If offline, save to pending queue
     if (!isOnline) {
       addPendingScan({
@@ -48,7 +48,7 @@ const ScanPage = () => {
       toast.success('Scan saved locally - will sync when online');
       return;
     }
-    
+
     const imageUrl = await uploadImage(capturedImage);
     if (imageUrl) {
       await saveScan(
@@ -112,11 +112,11 @@ const ScanPage = () => {
 
       {scanState === 'camera' && (
         <div className={`h-[calc(100vh-96px)] ${modelError ? 'pt-12' : ''}`}>
-          <CameraView 
-            onCapture={handleCapture} 
+          <CameraView
+            onCapture={handleCapture}
             onFileUpload={handleCapture}
           />
-          
+
           {/* Model status indicator */}
           {isModelReady && !isModelLoading && (
             <div className="absolute top-2 right-2 z-30">
@@ -133,39 +133,62 @@ const ScanPage = () => {
         <AnalyzingView imageUrl={capturedImage} />
       )}
 
-      {scanState === 'result' && result && (
+      {scanState === 'result' && (
         <ScrollArea className="h-[calc(100vh-160px)]">
-          <ResultCard 
-            result={result} 
-            onScanAgain={handleScanAgain}
-          />
-          
-          {/* Cloud save button for logged in users */}
-          {user && (
-            <motion.div
-              initial={{ opacity: 0, y: 20 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ delay: 0.3 }}
-              className="px-4 pb-4"
-            >
-              <Button 
-                variant="outline" 
-                className="w-full" 
-                onClick={handleSaveToCloud}
-              >
-                {isOnline ? (
-                  <>
-                    <Cloud className="w-4 h-4 mr-2" />
-                    Save to History
-                  </>
-                ) : (
-                  <>
-                    <WifiOff className="w-4 h-4 mr-2" />
-                    Save Offline
-                  </>
-                )}
+          {diagnosisError ? (
+            <div className="flex flex-col items-center justify-center p-8 h-full space-y-4 text-center mt-10">
+              <div className="w-16 h-16 rounded-full bg-destructive/10 flex items-center justify-center mb-2">
+                <AlertCircle className="w-8 h-8 text-destructive" />
+              </div>
+              <h3 className="text-xl font-bold text-foreground">No Crop Detected</h3>
+              <p className="text-muted-foreground max-w-md">
+                {diagnosisError.includes('No crop found')
+                  ? "It seems you scanned something else. Please make sure to scan a plant, crop, or natural product."
+                  : diagnosisError}
+              </p>
+              <Button onClick={handleScanAgain} className="mt-4">
+                Scan Again
               </Button>
-            </motion.div>
+            </div>
+          ) : result ? (
+            <>
+              <ResultCard
+                result={result}
+                onScanAgain={handleScanAgain}
+              />
+
+              {/* Cloud save button for logged in users */}
+              {user && (
+                <motion.div
+                  initial={{ opacity: 0, y: 20 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  transition={{ delay: 0.3 }}
+                  className="px-4 pb-4"
+                >
+                  <Button
+                    variant="outline"
+                    className="w-full"
+                    onClick={handleSaveToCloud}
+                  >
+                    {isOnline ? (
+                      <>
+                        <Cloud className="w-4 h-4 mr-2" />
+                        Save to History
+                      </>
+                    ) : (
+                      <>
+                        <WifiOff className="w-4 h-4 mr-2" />
+                        Save Offline
+                      </>
+                    )}
+                  </Button>
+                </motion.div>
+              )}
+            </>
+          ) : (
+            <div className="flex items-center justify-center h-full p-8">
+              <Button onClick={handleScanAgain}>Return to Camera</Button>
+            </div>
           )}
         </ScrollArea>
       )}

@@ -3,11 +3,12 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { DiagnosisResult, getConfidenceLevel, getConfidenceColor } from '@/types/diagnosis';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Button } from '@/components/ui/button';
-import { 
-  AlertTriangle, 
-  CheckCircle2, 
-  FlaskConical, 
-  Leaf, 
+import {
+  AlertTriangle,
+  AlertCircle,
+  CheckCircle2,
+  FlaskConical,
+  Leaf,
   Volume2,
   VolumeX,
   Pause,
@@ -33,8 +34,8 @@ const ResultCard = ({ result, onScanAgain }: ResultCardProps) => {
   const confidenceColor = getConfidenceColor(result.confidence);
   const isHealthy = result.diseaseName.toLowerCase().includes('healthy');
   const confidencePercent = Math.round(result.confidence * 100);
-  
-  const { language } = useLanguage();
+
+  const { language, t } = useLanguage();
   const { speak, speakSequence, stop, togglePause, isSpeaking, isPaused, isSupported } = useTextToSpeech({ language });
   const [isReadingAll, setIsReadingAll] = useState(false);
 
@@ -54,22 +55,22 @@ const ResultCard = ({ result, onScanAgain }: ResultCardProps) => {
     }
 
     setIsReadingAll(true);
-    
+
     const texts = [
       // Intro
-      `Scan result for ${result.crop}.`,
+      `${t('result')}: ${result.crop}.`,
       // Status
-      isHealthy 
-        ? `Good news! Your plant is healthy.`
-        : `Disease detected: ${result.diseaseName}.`,
+      isHealthy
+        ? t('healthyPlant')
+        : `${t('diseaseDetected')}: ${result.diseaseName}.`,
       // Confidence
-      `AI confidence level: ${confidencePercent} percent, ${confidenceLevel} accuracy.`,
+      `${t('confidenceScore')}: ${confidencePercent}%.`,
       // Chemical treatment
-      `Chemical treatment option: ${result.remedy.chemicalSolution}`,
+      `${t('chemical')}: ${result.remedy.chemicalSolution}`,
       // Organic treatment
-      `Natural treatment option: ${result.remedy.organicSolution}`,
+      `${t('natural')}: ${result.remedy.organicSolution}`,
       // Prevention
-      `Prevention tips: ${result.remedy.prevention}`,
+      `${t('prevention')}: ${result.remedy.prevention}`,
     ];
 
     speakSequence(texts, () => {
@@ -104,7 +105,7 @@ const ResultCard = ({ result, onScanAgain }: ResultCardProps) => {
           className="w-full h-52 object-cover"
         />
         <div className="absolute inset-0 bg-gradient-to-t from-black via-black/40 to-transparent" />
-        
+
         {/* AI Badge */}
         <div className="absolute top-4 right-4">
           <motion.div
@@ -114,10 +115,10 @@ const ResultCard = ({ result, onScanAgain }: ResultCardProps) => {
             className="flex items-center gap-1.5 bg-black/60 backdrop-blur-md px-3 py-1.5 rounded-full border border-white/20"
           >
             <Cpu className="w-3.5 h-3.5 text-primary" />
-            <span className="text-xs font-medium text-white">AI Verified</span>
+            <span className="text-xs font-medium text-white">{t('aiVerified')}</span>
           </motion.div>
         </div>
-        
+
         {/* Result content */}
         <div className="absolute bottom-0 left-0 right-0 p-5">
           {/* Status badge */}
@@ -127,19 +128,43 @@ const ResultCard = ({ result, onScanAgain }: ResultCardProps) => {
             transition={{ delay: 0.2 }}
             className={cn(
               "inline-flex items-center gap-2 px-4 py-2 rounded-full mb-3",
-              isHealthy 
-                ? "bg-success text-success-foreground" 
-                : "bg-destructive text-destructive-foreground"
+              isHealthy
+                ? "bg-success text-success-foreground"
+                : result.diseaseName === "No Crop Found"
+                  ? "bg-slate-500 text-white"
+                  : "bg-destructive text-destructive-foreground"
             )}
           >
             {isHealthy ? (
               <CheckCircle2 className="w-5 h-5" />
+            ) : result.diseaseName === "No Crop Found" ? (
+              <AlertCircle className="w-5 h-5" />
             ) : (
               <AlertTriangle className="w-5 h-5" />
             )}
-            <span className="font-semibold">{isHealthy ? 'Healthy Plant' : 'Disease Detected'}</span>
+            <span className="font-semibold">
+              {isHealthy
+                ? t('healthyPlant')
+                : result.diseaseName === "No Crop Found"
+                  ? t('noCropDetected')
+                  : t('diseaseDetected')}
+            </span>
           </motion.div>
-          
+
+          {/* Explicit Crop Identification Badge */}
+          {result.crop !== 'Unknown' && (
+            <motion.div
+              initial={{ opacity: 0, y: 5 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ delay: 0.25 }}
+              className="flex items-center gap-2 mb-2"
+            >
+              <div className="px-3 py-1 bg-white/20 backdrop-blur-md rounded-lg border border-white/10 text-white text-sm font-medium">
+                {t('cropIdentified')}: <span className="font-bold text-white">{result.crop}</span>
+              </div>
+            </motion.div>
+          )}
+
           {/* Disease name */}
           <motion.h1
             initial={{ y: 10, opacity: 0 }}
@@ -197,7 +222,7 @@ const ResultCard = ({ result, onScanAgain }: ResultCardProps) => {
                         <span className="w-1 h-6 bg-primary-foreground rounded-full animate-pulse delay-75" />
                         <span className="w-1 h-3 bg-primary-foreground rounded-full animate-pulse delay-150" />
                       </div>
-                      <span>Reading... Tap to Stop</span>
+                      <span>{t('stopReading')}</span>
                     </>
                   )}
                 </motion.div>
@@ -210,7 +235,7 @@ const ResultCard = ({ result, onScanAgain }: ResultCardProps) => {
                   className="flex items-center gap-3"
                 >
                   <Volume2 className="w-5 h-5" />
-                  <span>🔊 Read All Results Aloud</span>
+                  <span>🔊 {t('readAloud')}</span>
                 </motion.div>
               )}
             </AnimatePresence>
@@ -231,7 +256,7 @@ const ResultCard = ({ result, onScanAgain }: ResultCardProps) => {
               <TrendingUp className="w-5 h-5 text-primary" />
             </div>
             <div>
-              <p className="text-xs text-muted-foreground uppercase tracking-wider">AI Confidence</p>
+              <p className="text-xs text-muted-foreground uppercase tracking-wider">{t('confidenceScore')}</p>
               <p className="text-sm font-medium text-foreground">{confidenceLevel} accuracy</p>
             </div>
           </div>
@@ -247,7 +272,7 @@ const ResultCard = ({ result, onScanAgain }: ResultCardProps) => {
             <span className="text-lg text-muted-foreground">%</span>
           </div>
         </div>
-        
+
         {/* Animated progress bar */}
         <div className="h-3 bg-muted rounded-full overflow-hidden">
           <motion.div
@@ -269,7 +294,7 @@ const ResultCard = ({ result, onScanAgain }: ResultCardProps) => {
             />
           </motion.div>
         </div>
-        
+
         <div className="flex items-center gap-2 mt-3">
           <Sparkles className="w-4 h-4 text-warning" />
           <p className="text-xs text-muted-foreground">
@@ -288,22 +313,22 @@ const ResultCard = ({ result, onScanAgain }: ResultCardProps) => {
       >
         <Tabs defaultValue="chemical" className="mb-4">
           <TabsList className="grid w-full grid-cols-2 h-14 p-1 bg-muted rounded-xl">
-            <TabsTrigger 
-              value="chemical" 
+            <TabsTrigger
+              value="chemical"
               className="touch-target flex items-center gap-2 rounded-lg data-[state=active]:bg-card data-[state=active]:shadow-sm"
             >
               <FlaskConical className="w-4 h-4" />
-              <span className="font-medium">Chemical</span>
+              <span className="font-medium">{t('chemical')}</span>
             </TabsTrigger>
-            <TabsTrigger 
-              value="organic" 
+            <TabsTrigger
+              value="organic"
               className="touch-target flex items-center gap-2 rounded-lg data-[state=active]:bg-card data-[state=active]:shadow-sm"
             >
               <Leaf className="w-4 h-4" />
-              <span className="font-medium">Natural</span>
+              <span className="font-medium">{t('natural')}</span>
             </TabsTrigger>
           </TabsList>
-          
+
           <TabsContent value="chemical" className="mt-4">
             <div className="bg-card rounded-2xl p-5 border border-border shadow-sm">
               <div className="flex items-center justify-between mb-3">
@@ -311,9 +336,9 @@ const ResultCard = ({ result, onScanAgain }: ResultCardProps) => {
                   <div className="w-8 h-8 rounded-full bg-blue-500/10 flex items-center justify-center">
                     <FlaskConical className="w-4 h-4 text-blue-500" />
                   </div>
-                  <h3 className="font-semibold text-foreground">Chemical Treatment</h3>
+                  <h3 className="font-semibold text-foreground">{t('chemical')}</h3>
                 </div>
-                <button 
+                <button
                   onClick={() => speakText(result.remedy.chemicalSolution)}
                   className={cn(
                     "touch-target w-10 h-10 rounded-full flex items-center justify-center transition-colors",
@@ -333,7 +358,7 @@ const ResultCard = ({ result, onScanAgain }: ResultCardProps) => {
               </p>
             </div>
           </TabsContent>
-          
+
           <TabsContent value="organic" className="mt-4">
             <div className="bg-card rounded-2xl p-5 border border-border shadow-sm">
               <div className="flex items-center justify-between mb-3">
@@ -341,9 +366,9 @@ const ResultCard = ({ result, onScanAgain }: ResultCardProps) => {
                   <div className="w-8 h-8 rounded-full bg-success/10 flex items-center justify-center">
                     <Leaf className="w-4 h-4 text-success" />
                   </div>
-                  <h3 className="font-semibold text-foreground">Natural Treatment</h3>
+                  <h3 className="font-semibold text-foreground">{t('natural')}</h3>
                 </div>
-                <button 
+                <button
                   onClick={() => speakText(result.remedy.organicSolution)}
                   className={cn(
                     "touch-target w-10 h-10 rounded-full flex items-center justify-center transition-colors",
@@ -377,7 +402,7 @@ const ResultCard = ({ result, onScanAgain }: ResultCardProps) => {
           <div className="w-8 h-8 rounded-full bg-accent-foreground/10 flex items-center justify-center">
             <ShieldCheck className="w-4 h-4 text-accent-foreground" />
           </div>
-          <h3 className="font-semibold text-accent-foreground">Prevention Tips</h3>
+          <h3 className="font-semibold text-accent-foreground">{t('prevention')}</h3>
         </div>
         <p className="text-sm text-accent-foreground/80 leading-relaxed">
           {result.remedy.prevention}
@@ -398,7 +423,7 @@ const ResultCard = ({ result, onScanAgain }: ResultCardProps) => {
           onClick={handleShare}
         >
           <Share2 className="w-5 h-5 mr-2" />
-          Share
+          {t('share')}
         </Button>
         <Button
           size="lg"
@@ -406,7 +431,7 @@ const ResultCard = ({ result, onScanAgain }: ResultCardProps) => {
           onClick={onScanAgain}
         >
           <RefreshCw className="w-5 h-5 mr-2" />
-          Scan Again
+          {t('scanAgain')}
         </Button>
       </motion.div>
     </motion.div>
