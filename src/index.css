@@ -107,6 +107,24 @@
     @apply bg-background text-foreground;
     -webkit-tap-highlight-color: transparent;
     touch-action: manipulation;
+    overscroll-behavior-y: none; /* Prevent pull-to-refresh */
+    user-select: none; /* Prevent text selection like an app */
+    -webkit-user-select: none;
+  }
+
+  /* Allow text selection in specific areas */
+  p,
+  h1,
+  h2,
+  h3,
+  h4,
+  h5,
+  h6,
+  input,
+  textarea,
+  .selectable {
+    user-select: text;
+    -webkit-user-select: text;
   }
 
   /* Force mobile view even on desktop */
@@ -126,8 +144,19 @@
     min-height: 48px;
     min-width: 48px;
   }
-  
+
   .bg-gradient-radial {
     background: radial-gradient(circle at center, var(--tw-gradient-stops));
+  }
+
+  /* Safe Area Utilities */
+  .pb-safe {
+    padding-bottom: env(safe-area-inset-bottom);
+  }
+  .pt-safe {
+    padding-top: env(safe-area-inset-top);
+  }
+  .h-safe-bottom {
+    height: env(safe-area-inset-bottom);
   }
 }

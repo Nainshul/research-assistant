@@ -33,8 +33,7 @@ export const useScans = () => {
     try {
       const q = query(
         collection(db, 'scans'),
-        where('user_id', '==', user.uid),
-        orderBy('created_at', 'desc')
+        where('user_id', '==', user.uid)
       );
 
       const querySnapshot = await getDocs(q);
@@ -53,6 +52,9 @@ export const useScans = () => {
           created_at: data.created_at, // Assuming stored as ISO string or timestamp converted to string
         });
       });
+
+      // Sort client-side
+      fetchedScans.sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
 
       setScans(fetchedScans);
     } catch (error) {

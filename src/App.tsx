@@ -7,6 +7,7 @@ import { AuthProvider } from "@/contexts/AuthContext";
 import { LanguageProvider } from "@/contexts/LanguageContext";
 import OfflineIndicator from "@/components/OfflineIndicator";
 import RequireVerifiedEmail from "@/components/auth/RequireVerifiedEmail";
+import RequireAuth from "@/components/auth/RequireAuth";
 import Index from "./pages/Index";
 import ScanPage from "./pages/ScanPage";
 import CommunityPage from "./pages/CommunityPage";
@@ -31,7 +32,11 @@ const App = () => (
           <BrowserRouter>
             <Routes>
               <Route path="/" element={<Index />} />
-              <Route path="/scan" element={<ScanPage />} />
+              <Route path="/scan" element={
+                <RequireAuth>
+                  <ScanPage />
+                </RequireAuth>
+              } />
               <Route path="/community" element={
                 <RequireVerifiedEmail>
                   <CommunityPage />

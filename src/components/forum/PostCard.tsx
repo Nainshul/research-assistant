@@ -3,102 +3,158 @@ import { Card, CardContent, CardFooter, CardHeader } from '@/components/ui/card'
 import { Button } from '@/components/ui/button';
 import { Avatar, AvatarFallback } from '@/components/ui/avatar';
 import { Badge } from '@/components/ui/badge';
-import { Heart, MessageCircle, ChevronDown, ChevronUp } from 'lucide-react';
+import { Heart, MessageCircle, ChevronDown, ChevronUp, Trash2, MoreVertical, Edit2 } from 'lucide-react';
 import { ForumPost, useForumComments } from '@/hooks/useForum';
 import { useAuth } from '@/contexts/AuthContext';
 import { formatDistanceToNow } from 'date-fns';
 import CommentSection from './CommentSection';
+import EditPostDialog from './EditPostDialog';
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu';
 
 interface PostCardProps {
   post: ForumPost;
   onLike: (postId: string, hasLiked: boolean) => void;
+  onDelete?: (postId: string) => void;
+  onEdit?: (postId: string, updates: { title: string; content: string; crop_type?: string; image?: File | null; current_image_url?: string | null }) => Promise<void>;
+  isDeleting?: boolean;
 }
 
-const PostCard = ({ post, onLike }: PostCardProps) => {
+const PostCard = ({ post, onLike, onDelete, onEdit, isDeleting }: PostCardProps) => {
   const { user } = useAuth();
   const [showComments, setShowComments] = useState(false);
   const { comments, isLoading: commentsLoading, createComment, isCreating } = useForumComments(post.id);
+  
+  const [isEditOpen, setIsEditOpen] = useState(false);
 
   const authorName = post.author_name || 'Anonymous Farmer';
   const initials = authorName.split(' ').map(n => n[0]).join('').slice(0, 2).toUpperCase();
+  const isAuthor = user?.uid === post.user_id;
 
   return (
-    <Card className="overflow-hidden">
-      <CardHeader className="pb-3">
-        <div className="flex items-start gap-3">
-          <Avatar className="h-10 w-10">
-            <AvatarFallback className="bg-primary/10 text-primary text-sm">
-              {initials}
-            </AvatarFallback>
-          </Avatar>
-          <div className="flex-1 min-w-0">
-            <div className="flex items-center gap-2 flex-wrap">
-              <span className="font-medium text-foreground">{authorName}</span>
-              {post.crop_type && (
-                <Badge variant="secondary" className="text-xs">
-                  {post.crop_type}
-                </Badge>
-              )}
+    <>
+      <Card className="overflow-hidden border-border/60 shadow-sm hover:shadow-md transition-shadow">
+        <CardHeader className="pb-3 flex flex-row items-start justify-between space-y-0">
+          <div className="flex items-start gap-3">
+            <Avatar className="h-10 w-10 border border-border">
+              <AvatarFallback className="bg-primary/10 text-primary text-sm font-medium">
+                {initials}
+              </AvatarFallback>
+            </Avatar>
+            <div className="flex-1 min-w-0">
+              <div className="flex items-center gap-2 flex-wrap">
+                <span className="font-semibold text-foreground text-sm">{authorName}</span>
+                {post.crop_type && (
+                  <Badge variant="secondary" className="text-[10px] px-1.5 h-5 bg-secondary/50 text-secondary-foreground hover:bg-secondary/70">
+                    {post.crop_type}
+                  </Badge>
+                )}
+              </div>
+              <p className="text-xs text-muted-foreground mt-0.5">
+                {formatDistanceToNow(new Date(post.created_at), { addSuffix: true })}
+                {post.updated_at !== post.created_at && <span className="ml-1">(edited)</span>}
+              </p>
             </div>
-            <p className="text-xs text-muted-foreground">
-              {formatDistanceToNow(new Date(post.created_at), { addSuffix: true })}
-            </p>
           </div>
-        </div>
-      </CardHeader>
 
-      <CardContent className="pb-3">
-        <h3 className="font-semibold text-foreground mb-2">{post.title}</h3>
-        <p className="text-muted-foreground text-sm whitespace-pre-wrap">{post.content}</p>
-        
-        {post.image_url && (
-          <div className="mt-3 rounded-lg overflow-hidden">
-            <img 
-              src={post.image_url} 
-              alt="Post image" 
-              className="w-full max-h-64 object-cover"
+          {isAuthor && (onDelete || onEdit) && (
+            <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <Button variant="ghost" size="icon" className="h-8 w-8 -mr-2 text-muted-foreground">
+                      <MoreVertical className="h-4 w-4" />
+                  </Button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="end">
+                  {onEdit && (
+                    <DropdownMenuItem onClick={() => setIsEditOpen(true)}>
+                      <Edit2 className="w-4 h-4 mr-2" />
+                      Edit Post
+                    </DropdownMenuItem>
+                  )}
+                  {onDelete && (
+                    <DropdownMenuItem 
+                        className="text-destructive focus:text-destructive cursor-pointer"
+                        onClick={() => onDelete(post.id)}
+                        disabled={isDeleting}
+                    >
+                        <Trash2 className="w-4 h-4 mr-2" />
+                        Delete Post
+                    </DropdownMenuItem>
+                  )}
+                </DropdownMenuContent>
+            </DropdownMenu>
+          )}
+        </CardHeader>
+
+        <CardContent className="pb-3 space-y-3">
+          <div>
+            <h3 className="font-semibold text-foreground mb-1.5 leading-tight">{post.title}</h3>
+            <p className="text-muted-foreground text-sm whitespace-pre-wrap leading-relaxed">{post.content}</p>
+          </div>
+          
+          {post.image_url && (
+            <div className="rounded-xl overflow-hidden border border-border bg-muted/30">
+              <img 
+                src={post.image_url} 
+                alt="Post attachment" 
+                className="w-full max-h-80 object-cover hover:scale-[1.02] transition-transform duration-500"
+                loading="lazy"
+              />
+            </div>
+          )}
+        </CardContent>
+
+        <CardFooter className="pt-0 flex-col gap-3">
+          <div className="flex items-center justify-between w-full pt-2 border-t border-border/50">
+            <div className="flex items-center gap-4">
+              <Button
+                variant="ghost"
+                size="sm"
+                className={`gap-1.5 h-8 px-2 ${post.user_has_liked ? 'text-red-500 hover:text-red-600 hover:bg-red-500/10' : 'text-muted-foreground hover:text-foreground'}`}
+                onClick={() => user && onLike(post.id, post.user_has_liked)}
+                disabled={!user}
+              >
+                <Heart className={`h-4 w-4 ${post.user_has_liked ? 'fill-current' : ''}`} />
+                <span className="text-xs font-medium">{post.likes_count > 0 ? post.likes_count : 'Like'}</span>
+              </Button>
+
+              <Button
+                variant="ghost"
+                size="sm"
+                className="gap-1.5 h-8 px-2 text-muted-foreground hover:text-primary hover:bg-primary/10"
+                onClick={() => setShowComments(!showComments)}
+              >
+                <MessageCircle className="h-4 w-4" />
+                <span className="text-xs font-medium">{post.comments_count > 0 ? post.comments_count : 'Comment'}</span>
+                {showComments ? <ChevronUp className="h-3 w-3 ml-1" /> : <ChevronDown className="h-3 w-3 ml-1" />}
+              </Button>
+            </div>
+          </div>
+
+          {showComments && (
+            <CommentSection
+              comments={comments}
+              isLoading={commentsLoading}
+              onAddComment={createComment}
+              isCreating={isCreating}
             />
-          </div>
-        )}
-      </CardContent>
-
-      <CardFooter className="pt-0 flex-col gap-3">
-        <div className="flex items-center justify-between w-full">
-          <div className="flex items-center gap-4">
-            <Button
-              variant="ghost"
-              size="sm"
-              className={`gap-1.5 ${post.user_has_liked ? 'text-red-500' : 'text-muted-foreground'}`}
-              onClick={() => user && onLike(post.id, post.user_has_liked)}
-              disabled={!user}
-            >
-              <Heart className={`h-4 w-4 ${post.user_has_liked ? 'fill-current' : ''}`} />
-              <span>{post.likes_count}</span>
-            </Button>
-
-            <Button
-              variant="ghost"
-              size="sm"
-              className="gap-1.5 text-muted-foreground"
-              onClick={() => setShowComments(!showComments)}
-            >
-              <MessageCircle className="h-4 w-4" />
-              <span>{post.comments_count}</span>
-              {showComments ? <ChevronUp className="h-3 w-3" /> : <ChevronDown className="h-3 w-3" />}
-            </Button>
-          </div>
-        </div>
-
-        {showComments && (
-          <CommentSection
-            comments={comments}
-            isLoading={commentsLoading}
-            onAddComment={createComment}
-            isCreating={isCreating}
-          />
-        )}
-      </CardFooter>
-    </Card>
+          )}
+        </CardFooter>
+      </Card>
+      
+      {onEdit && (
+        <EditPostDialog 
+          post={post}
+          open={isEditOpen}
+          onOpenChange={setIsEditOpen}
+          onEdit={onEdit}
+        />
+      )}
+    </>
   );
 };
 

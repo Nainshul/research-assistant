@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import AppLayout from '@/components/layout/AppLayout';
-import { ArrowLeft, Save, Loader2, Globe, Mail, CheckCircle, AlertCircle, Lock, Link2, Unlink } from 'lucide-react';
+import { ArrowLeft, Save, Loader2, Globe, Mail, CheckCircle, AlertCircle, Lock, Link2, Unlink, MapPin } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -38,6 +38,7 @@ const SettingsPage = () => {
   const [isChangingPassword, setIsChangingPassword] = useState(false);
   const [isChangingEmail, setIsChangingEmail] = useState(false);
   const [isLinkingGoogle, setIsLinkingGoogle] = useState(false);
+  const [isGettingLocation, setIsGettingLocation] = useState(false);
 
   useEffect(() => {
     if (!authLoading && !user) {
@@ -191,6 +192,62 @@ const SettingsPage = () => {
     } finally {
       setIsLinkingGoogle(false);
     }
+  };
+
+  const handleGetLocation = () => {
+    if (!navigator.geolocation) {
+      toast.error('Geolocation is not supported by your browser');
+      return;
+    }
+
+    setIsGettingLocation(true);
+    navigator.geolocation.getCurrentPosition(
+      async (position) => {
+        try {
+          const { latitude, longitude } = position.coords;
+          
+          // Use OpenStreetMap Nominatim for reverse geocoding
+          const response = await fetch(
+            `https://nominatim.openstreetmap.org/reverse?format=json&lat=${latitude}&lon=${longitude}&zoom=10&addressdetails=1`
+          );
+          
+          if (!response.ok) throw new Error('Failed to fetch location data');
+          
+          const data = await response.json();
+          
+          const city = data.address.city || data.address.town || data.address.village || data.address.state_district;
+          const state = data.address.state;
+          const formattedLocation = [city, state].filter(Boolean).join(', ');
+
+          setProfile(prev => ({
+            ...prev,
+            location_district: formattedLocation || `${latitude.toFixed(4)}, ${longitude.toFixed(4)}`
+          }));
+          toast.success('Location updated');
+        } catch (error) {
+          console.error('Error getting location:', error);
+          toast.error('Failed to get address details');
+          // Fallback to coordinates
+          setProfile(prev => ({
+             ...prev,
+             location_district: `${position.coords.latitude.toFixed(4)}, ${position.coords.longitude.toFixed(4)}`
+          }));
+        } finally {
+          setIsGettingLocation(false);
+        }
+      },
+      (error) => {
+        console.error('Geolocation error:', error);
+        let errorMessage = 'Failed to get location';
+        if (error.code === 1) errorMessage = 'Location permission denied';
+        else if (error.code === 2) errorMessage = 'Location unavailable';
+        else if (error.code === 3) errorMessage = 'Location request timed out';
+        
+        toast.error(errorMessage);
+        setIsGettingLocation(false);
+      },
+      { enableHighAccuracy: true, timeout: 10000, maximumAge: 0 }
+    );
   };
 
   if (authLoading || isLoading) {
@@ -464,7 +521,22 @@ const SettingsPage = () => {
             </div>
 
             <div className="space-y-2">
-              <Label htmlFor="location_district">{t('locationDistrict')}</Label>
+              <div className="flex items-center justify-between">
+                <Label htmlFor="location_district">{t('locationDistrict')}</Label>
+                <button
+                  type="button"
+                  onClick={handleGetLocation}
+                  disabled={isGettingLocation}
+                  className="text-xs text-primary flex items-center gap-1 hover:underline disabled:opacity-50"
+                >
+                  {isGettingLocation ? (
+                    <Loader2 className="w-3 h-3 animate-spin" />
+                  ) : (
+                    <MapPin className="w-3 h-3" />
+                  )}
+                  {isGettingLocation ? 'Locating...' : 'Use Current Location'}
+                </button>
+              </div>
               <Input
                 id="location_district"
                 placeholder={t('enterLocation')}

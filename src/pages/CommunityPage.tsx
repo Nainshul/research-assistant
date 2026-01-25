@@ -1,93 +1,146 @@
-import { useNavigate } from 'react-router-dom';
+import { useState } from 'react';
 import AppLayout from '@/components/layout/AppLayout';
-import { Button } from '@/components/ui/button';
-import { Skeleton } from '@/components/ui/skeleton';
-import { MessageCircle, Lock, WifiOff } from 'lucide-react';
-import { useAuth } from '@/contexts/AuthContext';
-import { useForum } from '@/hooks/useForum';
 import PostCard from '@/components/forum/PostCard';
 import CreatePostDialog from '@/components/forum/CreatePostDialog';
+import { useForum } from '@/hooks/useForum';
+import { useAuth } from '@/contexts/AuthContext';
+import { useNavigate } from 'react-router-dom';
+import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import { 
+  Select, 
+  SelectContent, 
+  SelectItem, 
+  SelectTrigger, 
+  SelectValue 
+} from '@/components/ui/select';
+import { Search, Filter, ArrowUpDown, Loader2 } from 'lucide-react';
+import { motion, AnimatePresence } from 'framer-motion';
 
 const CommunityPage = () => {
-  const navigate = useNavigate();
+  const { posts, isLoading, createPost, isCreating, toggleLike, deletePost, isDeleting, editPost } = useForum();
   const { user } = useAuth();
-  const { posts, isLoading, createPost, isCreating, toggleLike } = useForum();
-  const isOnline = navigator.onLine;
+  const navigate = useNavigate();
+  
+  const [searchQuery, setSearchQuery] = useState('');
+  const [selectedCrop, setSelectedCrop] = useState<string>('all');
+  const [sortBy, setSortBy] = useState<'newest' | 'popular'>('newest');
 
-  if (!isOnline) {
-    return (
-      <AppLayout>
-        <div className="flex flex-col items-center justify-center min-h-[60vh] p-6 text-center">
-          <div className="w-20 h-20 rounded-full bg-muted flex items-center justify-center mb-6">
-            <WifiOff className="w-10 h-10 text-muted-foreground" />
-          </div>
-          <h1 className="text-2xl font-bold text-foreground mb-2">You're Offline</h1>
-          <p className="text-muted-foreground mb-6 max-w-xs">
-            The Community Forum requires an internet connection. Please check your connection and try again.
-          </p>
-        </div>
-      </AppLayout>
-    );
-  }
+  const filteredPosts = posts
+    .filter(post => {
+      const matchesSearch = post.title.toLowerCase().includes(searchQuery.toLowerCase()) || 
+                          post.content.toLowerCase().includes(searchQuery.toLowerCase());
+      const matchesCrop = selectedCrop === 'all' || post.crop_type === selectedCrop;
+      return matchesSearch && matchesCrop;
+    })
+    .sort((a, b) => {
+      if (sortBy === 'newest') {
+        return new Date(b.created_at).getTime() - new Date(a.created_at).getTime();
+      } else {
+        return b.likes_count - a.likes_count;
+      }
+    });
+
+  const handleCreatePost = (post: { title: string; content: string; crop_type?: string; image?: File | null }) => {
+    if (!user) {
+      navigate('/auth');
+      return;
+    }
+    createPost(post);
+  };
 
   return (
     <AppLayout>
-      <div className="p-4 pb-24 max-w-2xl mx-auto">
-        {/* Header */}
-        <div className="flex items-center justify-between mb-6">
-          <div>
-            <h1 className="text-2xl font-bold text-foreground">Community</h1>
-            <p className="text-muted-foreground text-sm">Ask questions & share tips</p>
-          </div>
-          
-          {user ? (
-            <CreatePostDialog onSubmit={createPost} isCreating={isCreating} />
-          ) : (
-            <Button onClick={() => navigate('/auth')} className="gap-2">
-              <Lock className="h-4 w-4" />
-              Sign in to Post
-            </Button>
-          )}
-        </div>
-
-        {/* Posts List */}
-        {isLoading ? (
-          <div className="space-y-4">
-            {[1, 2, 3].map((i) => (
-              <div key={i} className="rounded-xl border bg-card p-4 space-y-3">
-                <div className="flex items-center gap-3">
-                  <Skeleton className="h-10 w-10 rounded-full" />
-                  <div className="space-y-1.5">
-                    <Skeleton className="h-4 w-24" />
-                    <Skeleton className="h-3 w-16" />
-                  </div>
-                </div>
-                <Skeleton className="h-5 w-3/4" />
-                <Skeleton className="h-16 w-full" />
-              </div>
-            ))}
-          </div>
-        ) : posts.length === 0 ? (
-          <div className="flex flex-col items-center justify-center py-16 text-center">
-            <div className="w-16 h-16 rounded-full bg-muted flex items-center justify-center mb-4">
-              <MessageCircle className="w-8 h-8 text-muted-foreground" />
+      <div className="pb-24 pt-6 px-4 max-w-2xl mx-auto">
+        <div className="flex flex-col gap-6">
+          {/* Header */}
+          <div className="flex items-center justify-between">
+            <div>
+              <h1 className="text-2xl font-bold text-foreground">Community</h1>
+              <p className="text-muted-foreground text-sm">Connect with other farmers</p>
             </div>
-            <h2 className="text-lg font-semibold text-foreground mb-1">No posts yet</h2>
-            <p className="text-muted-foreground text-sm max-w-xs">
-              Be the first to ask a question or share farming tips with the community!
-            </p>
+            
+            <CreatePostDialog onSubmit={handleCreatePost} isCreating={isCreating} />
           </div>
-        ) : (
-          <div className="space-y-4">
-            {posts.map((post) => (
-              <PostCard 
-                key={post.id} 
-                post={post} 
-                onLike={(postId, hasLiked) => toggleLike({ postId, hasLiked })}
+
+          {/* Search and Filters */}
+          <div className="space-y-3 sticky top-0 z-10 bg-background/95 backdrop-blur-sm py-2 -mx-4 px-4 border-b border-border/50">
+            <div className="relative">
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+              <Input
+                placeholder="Search discussions..."
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                className="pl-9 bg-muted/50 border-transparent focus:bg-background transition-colors rounded-xl"
               />
-            ))}
+            </div>
+            
+            <div className="flex gap-2 overflow-x-auto pb-2 scrollbar-hide">
+              <Select value={selectedCrop} onValueChange={setSelectedCrop}>
+                <SelectTrigger className="w-[140px] h-9 rounded-lg border-muted-foreground/20 bg-card text-xs">
+                  <Filter className="w-3 h-3 mr-2" />
+                  <SelectValue placeholder="All Crops" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">All Crops</SelectItem>
+                  <SelectItem value="Rice">Rice</SelectItem>
+                  <SelectItem value="Wheat">Wheat</SelectItem>
+                  <SelectItem value="Corn">Corn</SelectItem>
+                  <SelectItem value="Tomato">Tomato</SelectItem>
+                  <SelectItem value="Potato">Potato</SelectItem>
+                  <SelectItem value="Cotton">Cotton</SelectItem>
+                  <SelectItem value="Sugarcane">Sugarcane</SelectItem>
+                </SelectContent>
+              </Select>
+
+              <Select value={sortBy} onValueChange={(v: any) => setSortBy(v)}>
+                <SelectTrigger className="w-[130px] h-9 rounded-lg border-muted-foreground/20 bg-card text-xs">
+                  <ArrowUpDown className="w-3 h-3 mr-2" />
+                  <SelectValue placeholder="Sort" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="newest">Newest First</SelectItem>
+                  <SelectItem value="popular">Most Popular</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
           </div>
-        )}
+
+          {/* Posts Feed */}
+          <div className="space-y-4 min-h-[50vh]">
+            {isLoading ? (
+              <div className="flex flex-col items-center justify-center py-12 gap-3 text-muted-foreground">
+                <Loader2 className="h-8 w-8 animate-spin text-primary" />
+                <p className="text-sm">Loading community posts...</p>
+              </div>
+            ) : filteredPosts.length === 0 ? (
+              <div className="text-center py-12 text-muted-foreground bg-muted/30 rounded-2xl border border-dashed border-border">
+                <p>No posts found. Be the first to start a discussion!</p>
+              </div>
+            ) : (
+              <AnimatePresence mode="popLayout">
+                {filteredPosts.map((post) => (
+                  <motion.div
+                    key={post.id}
+                    layout
+                    initial={{ opacity: 0, y: 20 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    exit={{ opacity: 0, scale: 0.95 }}
+                    transition={{ duration: 0.2 }}
+                  >
+                    <PostCard 
+                      post={post} 
+                      onLike={(id, hasLiked) => toggleLike({ postId: id, hasLiked })}
+                      onDelete={user?.uid === post.user_id ? deletePost : undefined}
+                      onEdit={user?.uid === post.user_id ? editPost : undefined}
+                      isDeleting={isDeleting}
+                    />
+                  </motion.div>
+                ))}
+              </AnimatePresence>
+            )}
+          </div>
+        </div>
       </div>
     </AppLayout>
   );

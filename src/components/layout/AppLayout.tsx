@@ -11,7 +11,7 @@ interface AppLayoutProps {
 
 const AppLayout = ({ children, hideHeader = false, hideNav = false }: AppLayoutProps) => {
   return (
-    <div className="min-h-screen flex flex-col bg-background">
+    <div className="min-h-[100dvh] flex flex-col bg-background">
       <EmailVerificationBanner />
       {!hideHeader && <Header />}
       

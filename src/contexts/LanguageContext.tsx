@@ -3,7 +3,7 @@ import { useAuth } from '@/contexts/AuthContext';
 import { db } from '@/lib/firebase';
 import { doc, getDoc, setDoc } from 'firebase/firestore';
 
-export type Language = 'en' | 'hi' | 'ta' | 'te' | 'kn' | 'mr';
+export type Language = 'en' | 'hi' | 'hinglish' | 'ta' | 'te' | 'kn' | 'mr';
 
 interface LanguageOption {
   code: Language;
@@ -14,6 +14,7 @@ interface LanguageOption {
 export const languages: LanguageOption[] = [
   { code: 'en', name: 'English', nativeName: 'English' },
   { code: 'hi', name: 'Hindi', nativeName: 'हिन्दी' },
+  { code: 'hinglish', name: 'Hinglish', nativeName: 'Hinglish' },
   { code: 'ta', name: 'Tamil', nativeName: 'தமிழ்' },
   { code: 'te', name: 'Telugu', nativeName: 'తెలుగు' },
   { code: 'kn', name: 'Kannada', nativeName: 'ಕನ್ನಡ' },
@@ -21,8 +22,7 @@ export const languages: LanguageOption[] = [
 ];
 
 // Translation strings
-const translations: Record<Language, Record<string, string>> = {
-  en: {
+const enTranslations = {
     // Common
     home: 'Home',
     scan: 'Scan',
@@ -90,7 +90,12 @@ const translations: Record<Language, Record<string, string>> = {
     diseaseDetected: 'Disease Detected',
     healthyPlant: 'Healthy Plant',
     confidenceScore: 'AI Confidence',
-  },
+};
+
+// Translation strings
+const translations: Record<Language, Record<string, string>> = {
+  en: enTranslations,
+  hinglish: enTranslations,
   hi: {
     home: 'होम',
     scan: 'स्कैन',
@@ -450,6 +455,7 @@ export const LanguageProvider = ({ children }: { children: ReactNode }) => {
   };
 
   const t = (key: string): string => {
+
     return translations[language][key] || translations['en'][key] || key;
   };
 

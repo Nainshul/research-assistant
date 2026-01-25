@@ -1,8 +1,22 @@
-import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { db } from '@/lib/firebase';
-import { collection, query, orderBy, getDocs, addDoc, where, doc, deleteDoc, getDoc } from 'firebase/firestore';
+import { useState, useEffect } from 'react';
+import { db, storage } from '@/lib/firebase';
+import { 
+  collection, 
+  query, 
+  orderBy, 
+  onSnapshot, 
+  addDoc, 
+  where, 
+  doc, 
+  deleteDoc, 
+  getDocs,
+  Timestamp,
+  updateDoc,
+  increment
+} from 'firebase/firestore';
+import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
 import { useAuth } from '@/contexts/AuthContext';
-import { toast } from '@/hooks/use-toast';
+import { toast } from 'sonner';
 
 export interface ForumPost {
   id: string;
@@ -31,156 +45,240 @@ export interface ForumComment {
 
 export const useForum = () => {
   const { user } = useAuth();
-  const queryClient = useQueryClient();
+  const [posts, setPosts] = useState<ForumPost[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
+  const [isCreating, setIsCreating] = useState(false);
+  const [isDeleting, setIsDeleting] = useState(false);
 
-  const postsQuery = useQuery({
-    queryKey: ['forum-posts'],
-    queryFn: async () => {
-      // Fetch posts
-      const postsRef = collection(db, 'posts');
-      const q = query(postsRef, orderBy('created_at', 'desc'));
-      const snapshot = await getDocs(q);
+  // Real-time Posts Listener
+  useEffect(() => {
+    const postsRef = collection(db, 'posts');
+    const q = query(postsRef, orderBy('created_at', 'desc'));
 
-      const posts = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as ForumPost));
+    const unsubscribe = onSnapshot(q, async (snapshot) => {
+      const postsData = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as ForumPost));
+      
+      // We still need to check likes for the current user
+      // Optimization: Fetch user likes once and map them
+      if (user) {
+         try {
+             const likesRef = collection(db, 'likes');
+             const likesQuery = query(likesRef, where('user_id', '==', user.uid));
+             const likesSnapshot = await getDocs(likesQuery);
+             const likedPostIds = new Set(likesSnapshot.docs.map(d => d.data().post_id));
+             
+             const enrichedPosts = postsData.map(post => ({
+                 ...post,
+                 user_has_liked: likedPostIds.has(post.id)
+             }));
+             setPosts(enrichedPosts);
+         } catch (error) {
+             console.error("Error fetching likes", error);
+             setPosts(postsData);
+         }
+      } else {
+         setPosts(postsData);
+      }
+      setIsLoading(false);
+    }, (error) => {
+      console.error("Error listening to posts:", error);
+      toast.error("Failed to load community posts");
+      setIsLoading(false);
+    });
 
-      // Fetch additional data (likes, comments, profiles)
-      // Note: Firestore doesn't support joins. Optimized way is to store counts on post doc.
-      // For now, doing separate queries (inefficient but compatible).
+    return () => unsubscribe();
+  }, [user]);
 
-      const postsWithCounts = await Promise.all(
-        posts.map(async (post) => {
-          // Likes count
-          const likesSnapshot = await getDocs(query(collection(db, 'likes'), where('post_id', '==', post.id)));
-          const commentsSnapshot = await getDocs(query(collection(db, 'comments'), where('post_id', '==', post.id)));
-
-          let userHasLiked = false;
-          if (user) {
-            const userLike = likesSnapshot.docs.find(d => d.data().user_id === user.uid);
-            userHasLiked = !!userLike;
-          }
-
-          // Author Name often stored in post or fetched from users collection. 
-          // Assuming stored in post for now or falling back to 'User'
-          const author_name = post.author_name || 'User';
-
-          return {
-            ...post,
-            author_name,
-            likes_count: likesSnapshot.size,
-            comments_count: commentsSnapshot.size,
-            user_has_liked: userHasLiked
-          };
-        })
-      );
-
-      return postsWithCounts;
+  const createPost = async (postData: { title: string; content: string; crop_type?: string; image?: File | null }) => {
+    if (!user) {
+      toast.error('You must be logged in to post');
+      return;
     }
-  });
 
-  const createPostMutation = useMutation({
-    mutationFn: async (post: { title: string; content: string; image_url?: string; crop_type?: string }) => {
-      if (!user) throw new Error('Must be logged in');
+    setIsCreating(true);
+    try {
+      let image_url = null;
+
+      if (postData.image) {
+        const storageRef = ref(storage, `post_images/${Date.now()}_${postData.image.name}`);
+        const snapshot = await uploadBytes(storageRef, postData.image);
+        image_url = await getDownloadURL(snapshot.ref);
+      }
 
       const newPost = {
         user_id: user.uid,
-        title: post.title,
-        content: post.content,
-        image_url: post.image_url || null,
-        crop_type: post.crop_type || null,
+        title: postData.title,
+        content: postData.content,
+        image_url,
+        crop_type: postData.crop_type || null,
         created_at: new Date().toISOString(),
         updated_at: new Date().toISOString(),
-        author_name: user.displayName || user.email || 'User' // Denormalize author name
+        author_name: user.displayName || 'Farmer',
+        likes_count: 0,
+        comments_count: 0
       };
 
-      const docRef = await addDoc(collection(db, 'posts'), newPost);
-      return { id: docRef.id, ...newPost };
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['forum-posts'] });
-      toast({ title: 'Post created', description: 'Your question has been posted to the community.' });
-    },
-    onError: (error) => {
-      toast({ title: 'Error', description: error.message, variant: 'destructive' });
+      await addDoc(collection(db, 'posts'), newPost);
+      toast.success('Post created successfully!');
+    } catch (error) {
+      console.error('Error creating post:', error);
+      toast.error('Failed to create post');
+    } finally {
+      setIsCreating(false);
     }
-  });
+  };
 
-  const toggleLikeMutation = useMutation({
-    mutationFn: async ({ postId, hasLiked }: { postId: string; hasLiked: boolean }) => {
-      if (!user) throw new Error('Must be logged in');
+  const deletePost = async (postId: string) => {
+    if (!user) return;
+    
+    setIsDeleting(true);
+    try {
+        await deleteDoc(doc(db, 'posts', postId));
+        toast.success('Post deleted');
+        
+        // Cleanup likes and comments (optional but good practice)
+        // Note: For large apps, use Cloud Functions for cleanup
+    } catch (error) {
+        console.error('Error deleting post:', error);
+        toast.error('Failed to delete post');
+    } finally {
+        setIsDeleting(false);
+    }
+  };
 
+  const toggleLike = async ({ postId, hasLiked }: { postId: string; hasLiked: boolean }) => {
+    if (!user) {
+        toast.error('Sign in to like posts');
+        return;
+    }
+
+    try {
       const likesRef = collection(db, 'likes');
-      const q = query(likesRef, where('post_id', '==', postId), where('user_id', '==', user.uid));
-      const snapshot = await getDocs(q);
-
+      const postRef = doc(db, 'posts', postId);
+      
       if (hasLiked) {
-        // Unlike
+        // Find the like doc
+        const q = query(likesRef, where('post_id', '==', postId), where('user_id', '==', user.uid));
+        const snapshot = await getDocs(q);
         snapshot.forEach(async (d) => {
           await deleteDoc(doc(db, 'likes', d.id));
         });
+        await updateDoc(postRef, { likes_count: increment(-1) });
       } else {
-        // Like
-        if (snapshot.empty) {
-          await addDoc(likesRef, { post_id: postId, user_id: user.uid, created_at: new Date().toISOString() });
-        }
+        await addDoc(likesRef, { 
+            post_id: postId, 
+            user_id: user.uid, 
+            created_at: new Date().toISOString() 
+        });
+        await updateDoc(postRef, { likes_count: increment(1) });
       }
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['forum-posts'] });
+    } catch (error) {
+      console.error('Error toggling like:', error);
     }
-  });
+  };
+
+  const editPost = async (postId: string, updates: { title: string; content: string; crop_type?: string; image?: File | null; current_image_url?: string | null }) => {
+    if (!user) return;
+
+    try {
+      const postRef = doc(db, 'posts', postId);
+      let image_url = updates.current_image_url;
+
+      if (updates.image) {
+         // Upload new image
+         const storageRef = ref(storage, `post_images/${Date.now()}_${updates.image.name}`);
+         const snapshot = await uploadBytes(storageRef, updates.image);
+         image_url = await getDownloadURL(snapshot.ref);
+      } else if (updates.image === null) {
+         // Explicitly removed image
+         image_url = null;
+      }
+      
+      await updateDoc(postRef, { 
+        title: updates.title,
+        content: updates.content,
+        crop_type: updates.crop_type || null,
+        image_url: image_url || null,
+        updated_at: new Date().toISOString()
+      });
+      toast.success('Post updated successfully');
+    } catch (error) {
+      console.error('Error updating post:', error);
+      toast.error('Failed to update post');
+      throw error;
+    }
+  };
 
   return {
-    posts: postsQuery.data || [],
-    isLoading: postsQuery.isLoading,
-    createPost: createPostMutation.mutate,
-    isCreating: createPostMutation.isPending,
-    toggleLike: toggleLikeMutation.mutate
+    posts,
+    isLoading,
+    createPost,
+    isCreating,
+    deletePost,
+    isDeleting,
+    toggleLike,
+    editPost
   };
 };
 
 export const useForumComments = (postId: string) => {
   const { user } = useAuth();
-  const queryClient = useQueryClient();
+  const [comments, setComments] = useState<ForumComment[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
+  const [isCreating, setIsCreating] = useState(false);
 
-  const commentsQuery = useQuery({
-    queryKey: ['forum-comments', postId],
-    queryFn: async () => {
-      const q = query(collection(db, 'comments'), where('post_id', '==', postId), orderBy('created_at', 'asc'));
-      const snapshot = await getDocs(q);
+  useEffect(() => {
+    const commentsRef = collection(db, 'comments');
+    const q = query(commentsRef, where('post_id', '==', postId), orderBy('created_at', 'asc'));
 
-      return snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as ForumComment));
+    const unsubscribe = onSnapshot(q, (snapshot) => {
+      const commentsData = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as ForumComment));
+      setComments(commentsData);
+      setIsLoading(false);
+    }, (error) => {
+       console.error("Error loading comments", error);
+       setIsLoading(false);
+    });
+
+    return () => unsubscribe();
+  }, [postId]);
+
+  const createComment = async (content: string) => {
+    if (!user) {
+        toast.error('Sign in to comment');
+        return;
     }
-  });
 
-  const createCommentMutation = useMutation({
-    mutationFn: async (content: string) => {
-      if (!user) throw new Error('Must be logged in');
-
+    setIsCreating(true);
+    try {
       const newComment = {
         post_id: postId,
         user_id: user.uid,
         content,
         created_at: new Date().toISOString(),
-        author_name: user.displayName || user.email || 'User',
+        author_name: user.displayName || 'Farmer',
         is_expert_answer: false
       };
 
-      const docRef = await addDoc(collection(db, 'comments'), newComment);
-      return { id: docRef.id, ...newComment };
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['forum-comments', postId] });
-      queryClient.invalidateQueries({ queryKey: ['forum-posts'] });
-    },
-    onError: (error) => {
-      toast({ title: 'Error', description: error.message, variant: 'destructive' });
+      await addDoc(collection(db, 'comments'), newComment);
+      
+      // Increment comment count on post
+      const postRef = doc(db, 'posts', postId);
+      await updateDoc(postRef, { comments_count: increment(1) });
+      
+      toast.success('Comment added');
+    } catch (error) {
+      console.error('Error creating comment:', error);
+      toast.error('Failed to add comment');
+    } finally {
+      setIsCreating(false);
     }
-  });
+  };
 
   return {
-    comments: commentsQuery.data || [],
-    isLoading: commentsQuery.isLoading,
-    createComment: createCommentMutation.mutate,
-    isCreating: createCommentMutation.isPending
+    comments,
+    isLoading,
+    createComment,
+    isCreating
   };
 };
