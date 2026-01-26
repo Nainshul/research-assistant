@@ -1,4 +1,4 @@
-import { useState, useRef, useCallback } from 'react';
+import { useState, useRef, useCallback } from "react";
 
 interface UseCameraReturn {
   videoRef: React.RefObject<HTMLVideoElement>;
@@ -20,11 +20,18 @@ export const useCamera = (): UseCameraReturn => {
   const startCamera = useCallback(async () => {
     try {
       setError(null);
-      
+
+      // Check if mediaDevices is supported
+      if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+        throw new Error(
+          "Camera access requires a secure connection (HTTPS). Please use localhost or set up HTTPS.",
+        );
+      }
+
       // Request camera with preference for back camera (environment)
       const stream = await navigator.mediaDevices.getUserMedia({
         video: {
-          facingMode: 'environment',
+          facingMode: "environment",
           width: { ideal: 1280 },
           height: { ideal: 720 },
         },
@@ -37,15 +44,16 @@ export const useCamera = (): UseCameraReturn => {
         setIsStreaming(true);
       }
     } catch (err) {
-      const message = err instanceof Error ? err.message : 'Failed to access camera';
+      const message =
+        err instanceof Error ? err.message : "Failed to access camera";
       setError(message);
-      console.error('Camera error:', err);
+      console.error("Camera error:", err);
     }
   }, []);
 
   const stopCamera = useCallback(() => {
     if (streamRef.current) {
-      streamRef.current.getTracks().forEach(track => track.stop());
+      streamRef.current.getTracks().forEach((track) => track.stop());
       streamRef.current = null;
     }
     if (videoRef.current) {
@@ -59,7 +67,7 @@ export const useCamera = (): UseCameraReturn => {
 
     const video = videoRef.current;
     const canvas = canvasRef.current;
-    const context = canvas.getContext('2d');
+    const context = canvas.getContext("2d");
 
     if (!context) return null;
 
@@ -71,7 +79,7 @@ export const useCamera = (): UseCameraReturn => {
     context.drawImage(video, 0, 0, canvas.width, canvas.height);
 
     // Convert to data URL (JPEG for smaller size)
-    return canvas.toDataURL('image/jpeg', 0.8);
+    return canvas.toDataURL("image/jpeg", 0.8);
   }, []);
 
   return {
