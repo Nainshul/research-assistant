@@ -1,5 +1,5 @@
-import { useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useState, useEffect } from 'react';
+import { useNavigate, useLocation } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import { Leaf, Mail, Lock, User, ArrowLeft, Eye, EyeOff, CheckCircle } from 'lucide-react';
 import { Button } from '@/components/ui/button';
@@ -34,15 +34,28 @@ type AuthMode = 'signin' | 'signup' | 'forgot';
 
 const AuthPage = () => {
   const navigate = useNavigate();
-  const { signIn, signUp, signInWithProvider, resetPassword } = useAuth();
+  const location = useLocation();
+  const { signIn, signUp, signInWithProvider, resetPassword, user } = useAuth();
   const { toast } = useToast();
-  
+
   const [mode, setMode] = useState<AuthMode>('signin');
   const [isLoading, setIsLoading] = useState(false);
   const [isGoogleLoading, setIsGoogleLoading] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
   const [resetEmailSent, setResetEmailSent] = useState(false);
-  
+
+  const from = location.state?.from?.pathname || '/';
+
+  useEffect(() => {
+    if (user) {
+      if (mode === 'signup') {
+        // for signup we might want to go to verify-email, but logic below handles it
+      } else {
+        navigate(from, { replace: true });
+      }
+    }
+  }, [user, navigate, from, mode]);
+
   const [formData, setFormData] = useState({
     email: '',
     password: '',
@@ -60,7 +73,7 @@ const AuthPage = () => {
       });
       setIsGoogleLoading(false);
     }
-    // Don't set loading to false on success - page will redirect
+    // Success will be handled by useEffect
   };
 
   const handleForgotPassword = async (e: React.FormEvent) => {
@@ -89,11 +102,11 @@ const AuthPage = () => {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    
+
     if (mode === 'forgot') {
       return handleForgotPassword(e);
     }
-    
+
     setIsLoading(true);
 
     try {
@@ -125,7 +138,7 @@ const AuthPage = () => {
             title: 'Welcome back!',
             description: 'You have signed in successfully.',
           });
-          navigate('/');
+          // Redirect handled by useEffect
         }
       }
     } finally {
@@ -150,7 +163,7 @@ const AuthPage = () => {
     return (
       <div className="min-h-screen bg-background max-w-[430px] mx-auto">
         <div className="p-4 flex items-center gap-4">
-          <button 
+          <button
             onClick={() => {
               setMode('signin');
               setResetEmailSent(false);
@@ -161,7 +174,7 @@ const AuthPage = () => {
           </button>
           <h1 className="text-lg font-semibold">Reset Password</h1>
         </div>
-        
+
         <div className="px-6 py-8 flex flex-col items-center">
           <motion.div
             initial={{ scale: 0.9, opacity: 0 }}
@@ -176,7 +189,7 @@ const AuthPage = () => {
               We sent a password reset link to<br />
               <span className="font-medium text-foreground">{formData.email}</span>
             </p>
-            <Button 
+            <Button
               variant="outline"
               onClick={() => {
                 setMode('signin');
@@ -196,7 +209,7 @@ const AuthPage = () => {
     <div className="min-h-screen bg-background max-w-[430px] mx-auto">
       {/* Header */}
       <div className="p-4 flex items-center gap-4">
-        <button 
+        <button
           onClick={() => mode === 'forgot' ? setMode('signin') : navigate(-1)}
           className="touch-target w-10 h-10 flex items-center justify-center rounded-full bg-muted"
         >
@@ -207,7 +220,7 @@ const AuthPage = () => {
 
       <div className="px-6 py-8">
         {/* Logo */}
-        <motion.div 
+        <motion.div
           initial={{ scale: 0.9, opacity: 0 }}
           animate={{ scale: 1, opacity: 1 }}
           className="flex flex-col items-center mb-8"
@@ -220,7 +233,7 @@ const AuthPage = () => {
         </motion.div>
 
         {/* Form */}
-        <motion.form 
+        <motion.form
           initial={{ y: 20, opacity: 0 }}
           animate={{ y: 0, opacity: 1 }}
           transition={{ delay: 0.1 }}
@@ -297,17 +310,17 @@ const AuthPage = () => {
             </div>
           )}
 
-          <Button 
-            type="submit" 
+          <Button
+            type="submit"
             className="w-full h-12 text-base font-semibold"
             disabled={isLoading || isGoogleLoading}
           >
-            {isLoading 
-              ? 'Please wait...' 
-              : mode === 'forgot' 
-                ? 'Send Reset Link' 
-                : mode === 'signin' 
-                  ? 'Sign In' 
+            {isLoading
+              ? 'Please wait...'
+              : mode === 'forgot'
+                ? 'Send Reset Link'
+                : mode === 'signin'
+                  ? 'Sign In'
                   : 'Create Account'}
           </Button>
         </motion.form>
@@ -347,7 +360,7 @@ const AuthPage = () => {
         )}
 
         {/* Toggle mode */}
-        <motion.div 
+        <motion.div
           initial={{ opacity: 0 }}
           animate={{ opacity: 1 }}
           transition={{ delay: 0.2 }}

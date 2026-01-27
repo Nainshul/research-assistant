@@ -1,4 +1,5 @@
 import { useState, useRef } from 'react';
+import { motion, AnimatePresence } from 'framer-motion';
 import {
   Dialog,
   DialogContent,
@@ -77,7 +78,6 @@ const CreatePostDialog = ({ onSubmit, isCreating }: CreatePostDialogProps) => {
       });
 
       if (success === true) {
-        // Only clear and close on actual success
         setTitle('');
         setContent('');
         setCropType('');
@@ -92,10 +92,12 @@ const CreatePostDialog = ({ onSubmit, isCreating }: CreatePostDialogProps) => {
   return (
     <Dialog open={open} onOpenChange={setOpen}>
       <DialogTrigger asChild>
-        <Button size="lg" className="gap-2 touch-target shadow-lg shadow-primary/25">
-          <Plus className="h-5 w-5" />
-          Ask Question
-        </Button>
+        <motion.div whileHover={{ scale: 1.05 }} whileTap={{ scale: 0.95 }}>
+          <Button size="lg" className="gap-2 touch-target shadow-lg shadow-primary/25">
+            <Plus className="h-5 w-5" />
+            Ask Question
+          </Button>
+        </motion.div>
       </DialogTrigger>
       <DialogContent className="sm:max-w-md mx-4 rounded-3xl">
         <DialogHeader>
@@ -182,16 +184,37 @@ const CreatePostDialog = ({ onSubmit, isCreating }: CreatePostDialogProps) => {
           <Button
             onClick={handleSubmit}
             disabled={!title.trim() || !content.trim() || isCreating}
-            className="rounded-xl px-6"
+            className="rounded-xl px-6 min-w-[140px] overflow-hidden"
+            asChild
           >
-            {isCreating ? (
-              <>
-                <Loader2 className="h-4 w-4 animate-spin mr-2" />
-                Posting...
-              </>
-            ) : (
-              'Post Question'
-            )}
+            <motion.button
+              whileTap={{ scale: 0.95 }}
+              layout
+            >
+              <AnimatePresence mode="wait">
+                {isCreating ? (
+                  <motion.div
+                    key="loading"
+                    initial={{ opacity: 0, y: 10 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    exit={{ opacity: 0, y: -10 }}
+                    className="flex items-center"
+                  >
+                    <Loader2 className="h-4 w-4 animate-spin mr-2" />
+                    Posting...
+                  </motion.div>
+                ) : (
+                  <motion.div
+                    key="idle"
+                    initial={{ opacity: 0, y: -10 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    exit={{ opacity: 0, y: 10 }}
+                  >
+                    Post Question
+                  </motion.div>
+                )}
+              </AnimatePresence>
+            </motion.button>
           </Button>
         </div>
       </DialogContent>

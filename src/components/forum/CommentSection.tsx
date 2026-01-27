@@ -3,7 +3,7 @@ import { Avatar, AvatarFallback } from '@/components/ui/avatar';
 import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
 import { Badge } from '@/components/ui/badge';
-import { Send, Loader2 } from 'lucide-react';
+import { Send, Loader2, Trash2 } from 'lucide-react';
 import { ForumComment } from '@/hooks/useForum';
 import { useAuth } from '@/contexts/AuthContext';
 import { formatDistanceToNow } from 'date-fns';
@@ -12,10 +12,11 @@ interface CommentSectionProps {
   comments: ForumComment[];
   isLoading: boolean;
   onAddComment: (content: string) => void;
+  onDeleteComment: (commentId: string) => void;
   isCreating: boolean;
 }
 
-const CommentSection = ({ comments, isLoading, onAddComment, isCreating }: CommentSectionProps) => {
+const CommentSection = ({ comments, isLoading, onAddComment, onDeleteComment, isCreating }: CommentSectionProps) => {
   const { user } = useAuth();
   const [newComment, setNewComment] = useState('');
 
@@ -40,7 +41,7 @@ const CommentSection = ({ comments, isLoading, onAddComment, isCreating }: Comme
           {comments.map((comment) => {
             const name = comment.author_name || 'Anonymous';
             const initials = name.split(' ').map(n => n[0]).join('').slice(0, 2).toUpperCase();
-            
+
             return (
               <div key={comment.id} className="flex gap-2">
                 <Avatar className="h-8 w-8 flex-shrink-0">
@@ -60,6 +61,16 @@ const CommentSection = ({ comments, isLoading, onAddComment, isCreating }: Comme
                   </div>
                   <p className="text-sm text-muted-foreground mt-0.5">{comment.content}</p>
                 </div>
+                {user?.uid === comment.user_id && (
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    className="h-6 w-6 text-muted-foreground hover:text-destructive self-start -mt-1"
+                    onClick={() => onDeleteComment(comment.id)}
+                  >
+                    <Trash2 className="h-3 w-3" />
+                  </Button>
+                )}
               </div>
             );
           })}

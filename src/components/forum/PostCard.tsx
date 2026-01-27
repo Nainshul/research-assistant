@@ -27,7 +27,7 @@ interface PostCardProps {
 const PostCard = ({ post, onLike, onDelete, onEdit, isDeleting }: PostCardProps) => {
   const { user } = useAuth();
   const [showComments, setShowComments] = useState(false);
-  const { comments, isLoading: commentsLoading, createComment, isCreating } = useForumComments(post.id);
+  const { comments, isLoading: commentsLoading, createComment, deleteComment, isCreating } = useForumComments(post.id);
 
   const [isEditOpen, setIsEditOpen] = useState(false);
 
@@ -160,6 +160,7 @@ const PostCard = ({ post, onLike, onDelete, onEdit, isDeleting }: PostCardProps)
               comments={comments}
               isLoading={commentsLoading}
               onAddComment={createComment}
+              onDeleteComment={deleteComment}
               isCreating={isCreating}
             />
           )}

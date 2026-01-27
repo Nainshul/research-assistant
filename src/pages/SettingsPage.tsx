@@ -9,8 +9,9 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Separator } from '@/components/ui/separator';
 import { useAuth } from '@/contexts/AuthContext';
 import { useLanguage, Language } from '@/contexts/LanguageContext';
-import { db } from '@/lib/firebase';
+import { db, auth } from '@/lib/firebase';
 import { doc, getDoc, setDoc, updateDoc } from 'firebase/firestore';
+import { updateProfile } from 'firebase/auth';
 import { toast } from 'sonner';
 import { motion } from 'framer-motion';
 
@@ -86,11 +87,16 @@ const SettingsPage = () => {
         user_id: user.uid // Ensure user_id is stored
       }, { merge: true });
 
+      // Update Firebase Auth Profile for immediate UI updates
+      if (profile.full_name && profile.full_name !== user.displayName) {
+        await updateProfile(user, { displayName: profile.full_name });
+      }
+
       toast.success(t('profileUpdated'));
       navigate('/profile');
-    } catch (error) {
+    } catch (error: any) {
       console.error('Error updating profile:', error);
-      toast.error(t('failedToUpdate'));
+      toast.error(error.message || t('failedToUpdate'));
     } finally {
       setIsSaving(false);
     }
@@ -205,16 +211,16 @@ const SettingsPage = () => {
       async (position) => {
         try {
           const { latitude, longitude } = position.coords;
-          
+
           // Use OpenStreetMap Nominatim for reverse geocoding
           const response = await fetch(
             `https://nominatim.openstreetmap.org/reverse?format=json&lat=${latitude}&lon=${longitude}&zoom=10&addressdetails=1`
           );
-          
+
           if (!response.ok) throw new Error('Failed to fetch location data');
-          
+
           const data = await response.json();
-          
+
           const city = data.address.city || data.address.town || data.address.village || data.address.state_district;
           const state = data.address.state;
           const formattedLocation = [city, state].filter(Boolean).join(', ');
@@ -229,8 +235,8 @@ const SettingsPage = () => {
           toast.error('Failed to get address details');
           // Fallback to coordinates
           setProfile(prev => ({
-             ...prev,
-             location_district: `${position.coords.latitude.toFixed(4)}, ${position.coords.longitude.toFixed(4)}`
+            ...prev,
+            location_district: `${position.coords.latitude.toFixed(4)}, ${position.coords.longitude.toFixed(4)}`
           }));
         } finally {
           setIsGettingLocation(false);
@@ -242,7 +248,7 @@ const SettingsPage = () => {
         if (error.code === 1) errorMessage = 'Location permission denied';
         else if (error.code === 2) errorMessage = 'Location unavailable';
         else if (error.code === 3) errorMessage = 'Location request timed out';
-        
+
         toast.error(errorMessage);
         setIsGettingLocation(false);
       },

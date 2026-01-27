@@ -7,6 +7,7 @@ import path from "path";
 import basicSsl from '@vitejs/plugin-basic-ssl';
 
 // https://vitejs.dev/config/
+// Trigger restart for env vars
 export default defineConfig(({ mode }) => ({
   server: {
     host: "::",
