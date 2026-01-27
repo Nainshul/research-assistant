@@ -28,7 +28,7 @@ const PostCard = ({ post, onLike, onDelete, onEdit, isDeleting }: PostCardProps)
   const { user } = useAuth();
   const [showComments, setShowComments] = useState(false);
   const { comments, isLoading: commentsLoading, createComment, isCreating } = useForumComments(post.id);
-  
+
   const [isEditOpen, setIsEditOpen] = useState(false);
 
   const authorName = post.author_name || 'Anonymous Farmer';
@@ -63,29 +63,29 @@ const PostCard = ({ post, onLike, onDelete, onEdit, isDeleting }: PostCardProps)
 
           {isAuthor && (onDelete || onEdit) && (
             <DropdownMenu>
-                <DropdownMenuTrigger asChild>
-                  <Button variant="ghost" size="icon" className="h-8 w-8 -mr-2 text-muted-foreground">
-                      <MoreVertical className="h-4 w-4" />
-                  </Button>
-                </DropdownMenuTrigger>
-                <DropdownMenuContent align="end">
-                  {onEdit && (
-                    <DropdownMenuItem onClick={() => setIsEditOpen(true)}>
-                      <Edit2 className="w-4 h-4 mr-2" />
-                      Edit Post
-                    </DropdownMenuItem>
-                  )}
-                  {onDelete && (
-                    <DropdownMenuItem 
-                        className="text-destructive focus:text-destructive cursor-pointer"
-                        onClick={() => onDelete(post.id)}
-                        disabled={isDeleting}
-                    >
-                        <Trash2 className="w-4 h-4 mr-2" />
-                        Delete Post
-                    </DropdownMenuItem>
-                  )}
-                </DropdownMenuContent>
+              <DropdownMenuTrigger asChild>
+                <Button variant="ghost" size="icon" className="h-8 w-8 -mr-2 text-muted-foreground">
+                  <MoreVertical className="h-4 w-4" />
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end">
+                {onEdit && (
+                  <DropdownMenuItem onClick={() => setIsEditOpen(true)}>
+                    <Edit2 className="w-4 h-4 mr-2" />
+                    Edit Post
+                  </DropdownMenuItem>
+                )}
+                {onDelete && (
+                  <DropdownMenuItem
+                    className="text-destructive focus:text-destructive cursor-pointer"
+                    onClick={() => onDelete(post.id)}
+                    disabled={isDeleting}
+                  >
+                    <Trash2 className="w-4 h-4 mr-2" />
+                    Delete Post
+                  </DropdownMenuItem>
+                )}
+              </DropdownMenuContent>
             </DropdownMenu>
           )}
         </CardHeader>
@@ -95,12 +95,12 @@ const PostCard = ({ post, onLike, onDelete, onEdit, isDeleting }: PostCardProps)
             <h3 className="font-semibold text-foreground mb-1.5 leading-tight">{post.title}</h3>
             <p className="text-muted-foreground text-sm whitespace-pre-wrap leading-relaxed">{post.content}</p>
           </div>
-          
+
           {post.image_url && (
             <div className="rounded-xl overflow-hidden border border-border bg-muted/30">
-              <img 
-                src={post.image_url} 
-                alt="Post attachment" 
+              <img
+                src={post.image_url}
+                alt="Post attachment"
                 className="w-full max-h-80 object-cover hover:scale-[1.02] transition-transform duration-500"
                 loading="lazy"
               />
@@ -135,6 +135,26 @@ const PostCard = ({ post, onLike, onDelete, onEdit, isDeleting }: PostCardProps)
             </div>
           </div>
 
+          {/* Comment Preview - Show recent 2 comments if not expanded */}
+          {!showComments && comments && comments.length > 0 && (
+            <div className="w-full bg-muted/20 rounded-lg p-3 space-y-2">
+              {comments.slice(-2).map((comment) => (
+                <div key={comment.id} className="flex gap-2">
+                  <span className="text-xs font-semibold text-foreground whitespace-nowrap">{comment.author_name || 'User'}:</span>
+                  <p className="text-xs text-muted-foreground line-clamp-1">{comment.content}</p>
+                </div>
+              ))}
+              {comments.length > 2 && (
+                <button
+                  onClick={() => setShowComments(true)}
+                  className="text-[10px] text-primary hover:underline font-medium pt-1"
+                >
+                  View all {comments.length} comments
+                </button>
+              )}
+            </div>
+          )}
+
           {showComments && (
             <CommentSection
               comments={comments}
@@ -145,9 +165,9 @@ const PostCard = ({ post, onLike, onDelete, onEdit, isDeleting }: PostCardProps)
           )}
         </CardFooter>
       </Card>
-      
+
       {onEdit && (
-        <EditPostDialog 
+        <EditPostDialog
           post={post}
           open={isEditOpen}
           onOpenChange={setIsEditOpen}

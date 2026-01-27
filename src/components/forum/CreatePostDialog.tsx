@@ -21,12 +21,12 @@ import {
 import { Plus, Loader2, Image as ImageIcon, X } from 'lucide-react';
 
 const CROP_TYPES = [
-  'Rice', 'Wheat', 'Corn', 'Tomato', 'Potato', 'Cotton', 
+  'Rice', 'Wheat', 'Corn', 'Tomato', 'Potato', 'Cotton',
   'Sugarcane', 'Soybean', 'Pepper', 'Grape', 'Apple', 'Other'
 ];
 
 interface CreatePostDialogProps {
-  onSubmit: (post: { title: string; content: string; crop_type?: string; image?: File | null }) => void;
+  onSubmit: (post: { title: string; content: string; crop_type?: string; image?: File | null }) => Promise<void | boolean>;
   isCreating: boolean;
 }
 
@@ -59,25 +59,34 @@ const CreatePostDialog = ({ onSubmit, isCreating }: CreatePostDialogProps) => {
     setSelectedImage(null);
     setImagePreview(null);
     if (fileInputRef.current) {
-        fileInputRef.current.value = '';
+      fileInputRef.current.value = '';
     }
   };
 
-  const handleSubmit = () => {
+  const handleSubmit = async () => {
     if (!title.trim() || !content.trim()) return;
-    
-    onSubmit({
-      title: title.trim(),
-      content: content.trim(),
-      crop_type: cropType || undefined,
-      image: selectedImage
-    });
-    
-    setTitle('');
-    setContent('');
-    setCropType('');
-    removeImage();
-    setOpen(false);
+
+    console.log('Submitting post:', { title, content, cropType, hasImage: !!selectedImage });
+
+    try {
+      const success = await onSubmit({
+        title: title.trim(),
+        content: content.trim(),
+        crop_type: cropType || undefined,
+        image: selectedImage
+      });
+
+      if (success === true) {
+        // Only clear and close on actual success
+        setTitle('');
+        setContent('');
+        setCropType('');
+        removeImage();
+        setOpen(false);
+      }
+    } catch (error) {
+      console.error("Error in dialog submission:", error);
+    }
   };
 
   return (
@@ -95,7 +104,7 @@ const CreatePostDialog = ({ onSubmit, isCreating }: CreatePostDialogProps) => {
             Share your plant health question with farmers and experts
           </DialogDescription>
         </DialogHeader>
-        
+
         <div className="space-y-4 py-4 max-h-[70vh] overflow-y-auto px-1">
           <div className="space-y-2">
             <Label htmlFor="title" className="font-semibold">Question Title <span className="text-destructive">*</span></Label>
@@ -136,33 +145,33 @@ const CreatePostDialog = ({ onSubmit, isCreating }: CreatePostDialogProps) => {
           </div>
 
           <div className="space-y-2">
-             <Label className="font-semibold">Add Photo</Label>
-             {imagePreview ? (
-                <div className="relative rounded-xl overflow-hidden border border-border">
-                   <img src={imagePreview} alt="Preview" className="w-full h-48 object-cover" />
-                   <button 
-                      onClick={removeImage}
-                      className="absolute top-2 right-2 p-1.5 bg-black/60 hover:bg-black/80 text-white rounded-full transition-colors"
-                   >
-                     <X className="w-4 h-4" />
-                   </button>
-                </div>
-             ) : (
-                <div 
-                   onClick={() => fileInputRef.current?.click()}
-                   className="border-2 border-dashed border-muted-foreground/30 h-24 rounded-xl flex flex-col items-center justify-center gap-2 cursor-pointer hover:bg-muted/50 transition-colors"
+            <Label className="font-semibold">Add Photo</Label>
+            {imagePreview ? (
+              <div className="relative rounded-xl overflow-hidden border border-border">
+                <img src={imagePreview} alt="Preview" className="w-full h-48 object-cover" />
+                <button
+                  onClick={removeImage}
+                  className="absolute top-2 right-2 p-1.5 bg-black/60 hover:bg-black/80 text-white rounded-full transition-colors"
                 >
-                   <ImageIcon className="w-6 h-6 text-muted-foreground" />
-                   <span className="text-sm text-muted-foreground font-medium">Click to upload image</span>
-                </div>
-             )}
-             <input 
-                type="file" 
-                ref={fileInputRef} 
-                onChange={handleImageSelect} 
-                accept="image/*" 
-                className="hidden" 
-             />
+                  <X className="w-4 h-4" />
+                </button>
+              </div>
+            ) : (
+              <div
+                onClick={() => fileInputRef.current?.click()}
+                className="border-2 border-dashed border-muted-foreground/30 h-24 rounded-xl flex flex-col items-center justify-center gap-2 cursor-pointer hover:bg-muted/50 transition-colors"
+              >
+                <ImageIcon className="w-6 h-6 text-muted-foreground" />
+                <span className="text-sm text-muted-foreground font-medium">Click to upload image</span>
+              </div>
+            )}
+            <input
+              type="file"
+              ref={fileInputRef}
+              onChange={handleImageSelect}
+              accept="image/*"
+              className="hidden"
+            />
           </div>
         </div>
 
@@ -170,8 +179,8 @@ const CreatePostDialog = ({ onSubmit, isCreating }: CreatePostDialogProps) => {
           <Button variant="outline" onClick={() => setOpen(false)} className="rounded-xl">
             Cancel
           </Button>
-          <Button 
-            onClick={handleSubmit} 
+          <Button
+            onClick={handleSubmit}
             disabled={!title.trim() || !content.trim() || isCreating}
             className="rounded-xl px-6"
           >

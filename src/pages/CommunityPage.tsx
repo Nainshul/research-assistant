@@ -7,12 +7,12 @@ import { useAuth } from '@/contexts/AuthContext';
 import { useNavigate } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { 
-  Select, 
-  SelectContent, 
-  SelectItem, 
-  SelectTrigger, 
-  SelectValue 
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue
 } from '@/components/ui/select';
 import { Search, Filter, ArrowUpDown, Loader2 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
@@ -21,15 +21,15 @@ const CommunityPage = () => {
   const { posts, isLoading, createPost, isCreating, toggleLike, deletePost, isDeleting, editPost } = useForum();
   const { user } = useAuth();
   const navigate = useNavigate();
-  
+
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedCrop, setSelectedCrop] = useState<string>('all');
   const [sortBy, setSortBy] = useState<'newest' | 'popular'>('newest');
 
   const filteredPosts = posts
     .filter(post => {
-      const matchesSearch = post.title.toLowerCase().includes(searchQuery.toLowerCase()) || 
-                          post.content.toLowerCase().includes(searchQuery.toLowerCase());
+      const matchesSearch = post.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
+        post.content.toLowerCase().includes(searchQuery.toLowerCase());
       const matchesCrop = selectedCrop === 'all' || post.crop_type === selectedCrop;
       return matchesSearch && matchesCrop;
     })
@@ -41,12 +41,12 @@ const CommunityPage = () => {
       }
     });
 
-  const handleCreatePost = (post: { title: string; content: string; crop_type?: string; image?: File | null }) => {
+  const handleCreatePost = async (post: { title: string; content: string; crop_type?: string; image?: File | null }) => {
     if (!user) {
       navigate('/auth');
       return;
     }
-    createPost(post);
+    return await createPost(post);
   };
 
   return (
@@ -59,7 +59,7 @@ const CommunityPage = () => {
               <h1 className="text-2xl font-bold text-foreground">Community</h1>
               <p className="text-muted-foreground text-sm">Connect with other farmers</p>
             </div>
-            
+
             <CreatePostDialog onSubmit={handleCreatePost} isCreating={isCreating} />
           </div>
 
@@ -74,7 +74,7 @@ const CommunityPage = () => {
                 className="pl-9 bg-muted/50 border-transparent focus:bg-background transition-colors rounded-xl"
               />
             </div>
-            
+
             <div className="flex gap-2 overflow-x-auto pb-2 scrollbar-hide">
               <Select value={selectedCrop} onValueChange={setSelectedCrop}>
                 <SelectTrigger className="w-[140px] h-9 rounded-lg border-muted-foreground/20 bg-card text-xs">
@@ -128,8 +128,8 @@ const CommunityPage = () => {
                     exit={{ opacity: 0, scale: 0.95 }}
                     transition={{ duration: 0.2 }}
                   >
-                    <PostCard 
-                      post={post} 
+                    <PostCard
+                      post={post}
                       onLike={(id, hasLiked) => toggleLike({ postId: id, hasLiked })}
                       onDelete={user?.uid === post.user_id ? deletePost : undefined}
                       onEdit={user?.uid === post.user_id ? editPost : undefined}

@@ -1,14 +1,14 @@
 import { useState, useEffect } from 'react';
 import { db, storage } from '@/lib/firebase';
-import { 
-  collection, 
-  query, 
-  orderBy, 
-  onSnapshot, 
-  addDoc, 
-  where, 
-  doc, 
-  deleteDoc, 
+import {
+  collection,
+  query,
+  orderBy,
+  onSnapshot,
+  addDoc,
+  where,
+  doc,
+  deleteDoc,
   getDocs,
   Timestamp,
   updateDoc,
@@ -53,31 +53,35 @@ export const useForum = () => {
   // Real-time Posts Listener
   useEffect(() => {
     const postsRef = collection(db, 'posts');
-    const q = query(postsRef, orderBy('created_at', 'desc'));
+    // Remove orderBy server-side to prevent index issues
+    const q = query(postsRef);
 
     const unsubscribe = onSnapshot(q, async (snapshot) => {
       const postsData = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as ForumPost));
-      
+
+      // Sort client-side
+      postsData.sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
+
       // We still need to check likes for the current user
       // Optimization: Fetch user likes once and map them
       if (user) {
-         try {
-             const likesRef = collection(db, 'likes');
-             const likesQuery = query(likesRef, where('user_id', '==', user.uid));
-             const likesSnapshot = await getDocs(likesQuery);
-             const likedPostIds = new Set(likesSnapshot.docs.map(d => d.data().post_id));
-             
-             const enrichedPosts = postsData.map(post => ({
-                 ...post,
-                 user_has_liked: likedPostIds.has(post.id)
-             }));
-             setPosts(enrichedPosts);
-         } catch (error) {
-             console.error("Error fetching likes", error);
-             setPosts(postsData);
-         }
+        try {
+          const likesRef = collection(db, 'likes');
+          const likesQuery = query(likesRef, where('user_id', '==', user.uid));
+          const likesSnapshot = await getDocs(likesQuery);
+          const likedPostIds = new Set(likesSnapshot.docs.map(d => d.data().post_id));
+
+          const enrichedPosts = postsData.map(post => ({
+            ...post,
+            user_has_liked: likedPostIds.has(post.id)
+          }));
+          setPosts(enrichedPosts);
+        } catch (error) {
+          console.error("Error fetching likes", error);
+          setPosts(postsData);
+        }
       } else {
-         setPosts(postsData);
+        setPosts(postsData);
       }
       setIsLoading(false);
     }, (error) => {
@@ -89,10 +93,10 @@ export const useForum = () => {
     return () => unsubscribe();
   }, [user]);
 
-  const createPost = async (postData: { title: string; content: string; crop_type?: string; image?: File | null }) => {
+  const createPost = async (postData: { title: string; content: string; crop_type?: string; image?: File | null }): Promise<boolean> => {
     if (!user) {
       toast.error('You must be logged in to post');
-      return;
+      return false;
     }
 
     setIsCreating(true);
@@ -100,11 +104,30 @@ export const useForum = () => {
       let image_url = null;
 
       if (postData.image) {
-        const storageRef = ref(storage, `post_images/${Date.now()}_${postData.image.name}`);
-        const snapshot = await uploadBytes(storageRef, postData.image);
-        image_url = await getDownloadURL(snapshot.ref);
+        console.log('Starting image upload:', postData.image.name);
+        try {
+          // Create a promise that rejects after 10 seconds
+          const timeoutPromise = new Promise((_, reject) =>
+            setTimeout(() => reject(new Error('Upload timed out')), 10000)
+          );
+
+          const storageRef = ref(storage, `post_images/${Date.now()}_${postData.image.name}`);
+          const uploadPromise = uploadBytes(storageRef, postData.image);
+
+          // Race the upload against the timeout
+          const snapshot = await Promise.race([uploadPromise, timeoutPromise]) as any;
+
+          console.log('Image uploaded successfully, getting URL...');
+          image_url = await getDownloadURL(snapshot.ref);
+          console.log('Image URL retrieved:', image_url);
+        } catch (uploadError) {
+          console.error('Error uploading image:', uploadError);
+          toast.error('Image upload failed/timed out, creating post without image.');
+          // Proceed without image
+        }
       }
 
+      console.log('Creating post document in Firestore...');
       const newPost = {
         user_id: user.uid,
         title: postData.title,
@@ -118,11 +141,14 @@ export const useForum = () => {
         comments_count: 0
       };
 
-      await addDoc(collection(db, 'posts'), newPost);
+      const docRef = await addDoc(collection(db, 'posts'), newPost);
+      console.log('Post created with ID:', docRef.id);
       toast.success('Post created successfully!');
+      return true;
     } catch (error) {
       console.error('Error creating post:', error);
-      toast.error('Failed to create post');
+      toast.error('Failed to create post: ' + (error instanceof Error ? error.message : 'Unknown error'));
+      return false;
     } finally {
       setIsCreating(false);
     }
@@ -130,32 +156,32 @@ export const useForum = () => {
 
   const deletePost = async (postId: string) => {
     if (!user) return;
-    
+
     setIsDeleting(true);
     try {
-        await deleteDoc(doc(db, 'posts', postId));
-        toast.success('Post deleted');
-        
-        // Cleanup likes and comments (optional but good practice)
-        // Note: For large apps, use Cloud Functions for cleanup
+      await deleteDoc(doc(db, 'posts', postId));
+      toast.success('Post deleted');
+
+      // Cleanup likes and comments (optional but good practice)
+      // Note: For large apps, use Cloud Functions for cleanup
     } catch (error) {
-        console.error('Error deleting post:', error);
-        toast.error('Failed to delete post');
+      console.error('Error deleting post:', error);
+      toast.error('Failed to delete post');
     } finally {
-        setIsDeleting(false);
+      setIsDeleting(false);
     }
   };
 
   const toggleLike = async ({ postId, hasLiked }: { postId: string; hasLiked: boolean }) => {
     if (!user) {
-        toast.error('Sign in to like posts');
-        return;
+      toast.error('Sign in to like posts');
+      return;
     }
 
     try {
       const likesRef = collection(db, 'likes');
       const postRef = doc(db, 'posts', postId);
-      
+
       if (hasLiked) {
         // Find the like doc
         const q = query(likesRef, where('post_id', '==', postId), where('user_id', '==', user.uid));
@@ -165,10 +191,10 @@ export const useForum = () => {
         });
         await updateDoc(postRef, { likes_count: increment(-1) });
       } else {
-        await addDoc(likesRef, { 
-            post_id: postId, 
-            user_id: user.uid, 
-            created_at: new Date().toISOString() 
+        await addDoc(likesRef, {
+          post_id: postId,
+          user_id: user.uid,
+          created_at: new Date().toISOString()
         });
         await updateDoc(postRef, { likes_count: increment(1) });
       }
@@ -185,16 +211,16 @@ export const useForum = () => {
       let image_url = updates.current_image_url;
 
       if (updates.image) {
-         // Upload new image
-         const storageRef = ref(storage, `post_images/${Date.now()}_${updates.image.name}`);
-         const snapshot = await uploadBytes(storageRef, updates.image);
-         image_url = await getDownloadURL(snapshot.ref);
+        // Upload new image
+        const storageRef = ref(storage, `post_images/${Date.now()}_${updates.image.name}`);
+        const snapshot = await uploadBytes(storageRef, updates.image);
+        image_url = await getDownloadURL(snapshot.ref);
       } else if (updates.image === null) {
-         // Explicitly removed image
-         image_url = null;
+        // Explicitly removed image
+        image_url = null;
       }
-      
-      await updateDoc(postRef, { 
+
+      await updateDoc(postRef, {
         title: updates.title,
         content: updates.content,
         crop_type: updates.crop_type || null,
@@ -229,15 +255,20 @@ export const useForumComments = (postId: string) => {
 
   useEffect(() => {
     const commentsRef = collection(db, 'comments');
-    const q = query(commentsRef, where('post_id', '==', postId), orderBy('created_at', 'asc'));
+    // Remove orderBy server-side to prevent index requirements
+    const q = query(commentsRef, where('post_id', '==', postId));
 
     const unsubscribe = onSnapshot(q, (snapshot) => {
       const commentsData = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as ForumComment));
+
+      // Sort client-side
+      commentsData.sort((a, b) => new Date(a.created_at).getTime() - new Date(b.created_at).getTime());
+
       setComments(commentsData);
       setIsLoading(false);
     }, (error) => {
-       console.error("Error loading comments", error);
-       setIsLoading(false);
+      console.error("Error loading comments", error);
+      setIsLoading(false);
     });
 
     return () => unsubscribe();
@@ -245,8 +276,8 @@ export const useForumComments = (postId: string) => {
 
   const createComment = async (content: string) => {
     if (!user) {
-        toast.error('Sign in to comment');
-        return;
+      toast.error('Sign in to comment');
+      return;
     }
 
     setIsCreating(true);
@@ -261,11 +292,11 @@ export const useForumComments = (postId: string) => {
       };
 
       await addDoc(collection(db, 'comments'), newComment);
-      
+
       // Increment comment count on post
       const postRef = doc(db, 'posts', postId);
       await updateDoc(postRef, { comments_count: increment(1) });
-      
+
       toast.success('Comment added');
     } catch (error) {
       console.error('Error creating comment:', error);
