@@ -9,6 +9,7 @@ import basicSsl from '@vitejs/plugin-basic-ssl';
 // https://vitejs.dev/config/
 // Trigger restart for env vars
 export default defineConfig(({ mode }) => ({
+  base: "/research-assistant/",
   server: {
     host: "::",
     port: 8080,

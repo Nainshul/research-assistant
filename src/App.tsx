@@ -29,7 +29,7 @@ const App = () => (
           <Toaster />
           <Sonner />
           <OfflineIndicator />
-          <BrowserRouter>
+          <BrowserRouter basename="/research-assistant">
             <Routes>
               <Route path="/" element={<Index />} />
               <Route path="/scan" element={
