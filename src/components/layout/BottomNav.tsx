@@ -1,4 +1,4 @@
-import { Home, MessageCircle, User, Camera } from 'lucide-react';
+import { Home, MessageCircle, User, Camera, Calendar } from 'lucide-react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { cn } from '@/lib/utils';
 
@@ -10,6 +10,7 @@ interface NavItem {
 
 const navItems: NavItem[] = [
   { icon: Home, label: 'Home', path: '/' },
+  { icon: Calendar, label: 'Calendar', path: '/calendar' },
   { icon: Camera, label: 'Scan', path: '/scan' },
   { icon: MessageCircle, label: 'Community', path: '/community' },
   { icon: User, label: 'Profile', path: '/profile' },
@@ -42,8 +43,8 @@ const BottomNav = () => {
               {isScan ? (
                 <div className={cn(
                   "w-16 h-16 rounded-full flex items-center justify-center shadow-2xl shadow-primary/40 transition-all duration-300 border-4 border-background",
-                  isActive 
-                    ? "bg-gradient-to-br from-primary to-green-600 text-white scale-110" 
+                  isActive
+                    ? "bg-gradient-to-br from-primary to-green-600 text-white scale-110"
                     : "bg-primary text-white hover:bg-primary/90"
                 )}>
                   <Icon className="w-7 h-7" />

@@ -24,6 +24,7 @@ import { cn } from '@/lib/utils';
 import { useTextToSpeech } from '@/hooks/useTextToSpeech';
 import { useLanguage } from '@/contexts/LanguageContext';
 import ReactMarkdown from 'react-markdown';
+import CropAssistant from './CropAssistant';
 
 import {
   Select,
@@ -139,20 +140,20 @@ const ResultCard = ({ result, onScanAgain, onLanguageChange }: ResultCardProps) 
 
           {/* Real-time Language Selector */}
           {onLanguageChange && (
-             <div className="bg-black/40 backdrop-blur-md rounded-xl border border-white/10 shadow-lg p-0.5">
-               <Select value={language} onValueChange={handleLanguageChange}>
-                  <SelectTrigger className="h-8 border-none bg-transparent text-white text-xs font-medium w-[100px] focus:ring-0 focus:ring-offset-0">
-                    <SelectValue placeholder="Language" />
-                  </SelectTrigger>
-                  <SelectContent align="end" className="w-[120px]">
-                    {languages.filter(l => ['en', 'hi', 'hinglish'].includes(l.code)).map((lang) => (
-                      <SelectItem key={lang.code} value={lang.code} className="text-xs font-medium">
-                        {lang.name}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-               </Select>
-             </div>
+            <div className="bg-black/40 backdrop-blur-md rounded-xl border border-white/10 shadow-lg p-0.5">
+              <Select value={language} onValueChange={handleLanguageChange}>
+                <SelectTrigger className="h-8 border-none bg-transparent text-white text-xs font-medium w-[100px] focus:ring-0 focus:ring-offset-0">
+                  <SelectValue placeholder="Language" />
+                </SelectTrigger>
+                <SelectContent align="end" className="w-[120px]">
+                  {languages.filter(l => ['en', 'hi', 'hinglish'].includes(l.code)).map((lang) => (
+                    <SelectItem key={lang.code} value={lang.code} className="text-xs font-medium">
+                      {lang.name}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
           )}
         </div>
 
@@ -164,22 +165,25 @@ const ResultCard = ({ result, onScanAgain, onLanguageChange }: ResultCardProps) 
             animate={{ x: 0, opacity: 1 }}
             transition={{ delay: 0.2 }}
             className={cn(
-              "inline-flex items-center gap-2 px-3 py-1.5 rounded-xl mb-3 border backdrop-blur-md shadow-lg",
+              "inline-flex items-center gap-3 px-6 py-3 rounded-2xl mb-4 border backdrop-blur-md shadow-lg",
               isHealthy
                 ? "bg-success/20 border-success/30 text-success-foreground"
                 : result.diseaseName === "No Crop Found"
                   ? "bg-slate-500/20 border-slate-500/30 text-white"
-                  : "bg-destructive/20 border-destructive/30 text-red-200"
+                  : "bg-destructive/20 border-destructive/30 text-red-700"
             )}
           >
             {isHealthy ? (
-              <CheckCircle2 className="w-4 h-4 text-success" />
+              <CheckCircle2 className="w-6 h-6 text-success" />
             ) : result.diseaseName === "No Crop Found" ? (
-              <AlertCircle className="w-4 h-4 text-slate-300" />
+              <AlertCircle className="w-6 h-6 text-slate-300" />
             ) : (
-              <AlertTriangle className="w-4 h-4 text-destructive" />
+              <AlertTriangle className="w-6 h-6 text-red-700" />
             )}
-            <span className="text-sm font-bold tracking-wide text-white">
+            <span className={cn(
+              "text-lg font-extrabold tracking-wide",
+              isHealthy || result.diseaseName === "No Crop Found" ? "text-white" : "text-red-700"
+            )}>
               {isHealthy
                 ? t('healthyPlant')
                 : result.diseaseName === "No Crop Found"
@@ -194,7 +198,7 @@ const ResultCard = ({ result, onScanAgain, onLanguageChange }: ResultCardProps) 
             animate={{ y: 0, opacity: 1 }}
             transition={{ delay: 0.3 }}
           >
-             <h1 className="text-3xl font-extrabold text-white mb-1 leading-none tracking-tight">
+            <h1 className="text-3xl font-extrabold text-white mb-1 leading-none tracking-tight">
               {result.diseaseName}
             </h1>
             <p className="text-white/80 text-base font-medium flex items-center gap-2">
@@ -202,6 +206,14 @@ const ResultCard = ({ result, onScanAgain, onLanguageChange }: ResultCardProps) 
             </p>
           </motion.div>
         </div>
+      </div>
+
+      {/* 🟢 Context-Aware AI Consultant - Placed Directly Below Image 🟢 */}
+      <div className="mb-6 -mt-2">
+        <CropAssistant
+          diseaseName={result.diseaseName}
+          cropName={result.crop}
+        />
       </div>
 
       {/* TTS Button - Floating style */}
@@ -217,8 +229,8 @@ const ResultCard = ({ result, onScanAgain, onLanguageChange }: ResultCardProps) 
             variant={isReadingAll ? "default" : "outline"}
             className={cn(
               "w-full h-16 rounded-2xl gap-3 text-base font-bold transition-all shadow-sm border-2",
-              isReadingAll 
-                ? "bg-primary text-white border-primary shadow-primary/20" 
+              isReadingAll
+                ? "bg-primary text-white border-primary shadow-primary/20"
                 : "bg-card hover:bg-muted border-border"
             )}
           >
@@ -268,42 +280,42 @@ const ResultCard = ({ result, onScanAgain, onLanguageChange }: ResultCardProps) 
       <div className="grid grid-cols-1 gap-4 mb-6">
         {/* Confidence Card */}
         <motion.div
-            initial={{ y: 20, opacity: 0 }}
-            animate={{ y: 0, opacity: 1 }}
-            transition={{ delay: 0.5 }}
-            className="bg-card rounded-3xl p-6 border border-border shadow-sm relative overflow-hidden group"
-          >
-            <div className="absolute top-0 right-0 p-4 opacity-5 group-hover:opacity-10 transition-opacity">
-               <TrendingUp className="w-24 h-24 text-primary" />
-            </div>
+          initial={{ y: 20, opacity: 0 }}
+          animate={{ y: 0, opacity: 1 }}
+          transition={{ delay: 0.5 }}
+          className="bg-card rounded-3xl p-6 border border-border shadow-sm relative overflow-hidden group"
+        >
+          <div className="absolute top-0 right-0 p-4 opacity-5 group-hover:opacity-10 transition-opacity">
+            <TrendingUp className="w-24 h-24 text-primary" />
+          </div>
 
-            <div className="flex flex-col gap-4 relative z-10">
-              <div className="flex justify-between items-end">
-                 <div>
-                    <h3 className="text-sm font-bold text-muted-foreground uppercase tracking-widest mb-1">{t('confidenceScore')}</h3>
-                    <p className="text-xs text-muted-foreground">{confidenceLevel} Accuracy Match</p>
-                 </div>
-                 <div className="flex items-baseline gap-1">
-                    <span className="text-4xl font-black text-foreground">{confidencePercent}</span>
-                    <span className="text-xl font-bold text-muted-foreground">%</span>
-                 </div>
+          <div className="flex flex-col gap-4 relative z-10">
+            <div className="flex justify-between items-end">
+              <div>
+                <h3 className="text-sm font-bold text-muted-foreground uppercase tracking-widest mb-1">{t('confidenceScore')}</h3>
+                <p className="text-xs text-muted-foreground">{confidenceLevel} Accuracy Match</p>
               </div>
-
-               {/* Progress Bar */}
-              <div className="h-4 bg-muted/50 rounded-full overflow-hidden p-1">
-                <motion.div
-                  initial={{ width: 0 }}
-                  animate={{ width: `${confidencePercent}%` }}
-                  transition={{ duration: 1, ease: 'easeOut', delay: 0.5 }}
-                  className={cn(
-                    "h-full rounded-full relative overflow-hidden shadow-sm",
-                    confidenceColor === 'success' && "bg-gradient-to-r from-green-500 to-green-400",
-                    confidenceColor === 'warning' && "bg-gradient-to-r from-yellow-500 to-yellow-400",
-                    confidenceColor === 'destructive' && "bg-gradient-to-r from-red-500 to-red-400"
-                  )}
-                />
+              <div className="flex items-baseline gap-1">
+                <span className="text-4xl font-black text-foreground">{confidencePercent}</span>
+                <span className="text-xl font-bold text-muted-foreground">%</span>
               </div>
             </div>
+
+            {/* Progress Bar */}
+            <div className="h-4 bg-muted/50 rounded-full overflow-hidden p-1">
+              <motion.div
+                initial={{ width: 0 }}
+                animate={{ width: `${confidencePercent}%` }}
+                transition={{ duration: 1, ease: 'easeOut', delay: 0.5 }}
+                className={cn(
+                  "h-full rounded-full relative overflow-hidden shadow-sm",
+                  confidenceColor === 'success' && "bg-gradient-to-r from-green-500 to-green-400",
+                  confidenceColor === 'warning' && "bg-gradient-to-r from-yellow-500 to-yellow-400",
+                  confidenceColor === 'destructive' && "bg-gradient-to-r from-red-500 to-red-400"
+                )}
+              />
+            </div>
+          </div>
         </motion.div>
 
         {/* Treatment Tabs */}
@@ -328,117 +340,117 @@ const ResultCard = ({ result, onScanAgain, onLanguageChange }: ResultCardProps) 
                 className="rounded-xl h-full data-[state=active]:bg-card data-[state=active]:shadow-sm data-[state=active]:ring-1 ring-black/5"
               >
                 <div className="flex items-center gap-2">
-                   <Leaf className="w-4 h-4" />
-                   <span className="font-bold text-sm">{t('natural')}</span>
+                  <Leaf className="w-4 h-4" />
+                  <span className="font-bold text-sm">{t('natural')}</span>
                 </div>
               </TabsTrigger>
             </TabsList>
 
             <TabsContent value="chemical" className="mt-4">
-               <div className="bg-card rounded-[2rem] p-6 border border-border shadow-sm min-h-[140px] flex flex-col justify-center relative">
-                  <div className="absolute top-4 right-4">
-                     <Button
-                        size="icon"
-                        variant="ghost"
-                        className="rounded-full bg-primary/5 hover:bg-primary/10 text-primary"
-                        onClick={() => speakText(result.remedy.chemicalSolution)}
-                     >
-                       <Volume2 className="w-5 h-5" />
-                     </Button>
-                  </div>
-                  <h4 className="font-bold text-foreground mb-2 flex items-center gap-2">
-                     <span className="w-2 h-2 rounded-full bg-blue-500" />
-                     Recommended Action
-                  </h4>
-                  <div className="text-muted-foreground leading-relaxed">
-                     <ReactMarkdown 
-                        components={{
-                          ul: ({node, ...props}) => <ul className="space-y-4 my-3" {...props} />,
-                          li: ({node, ...props}) => (
-                            <li className="flex gap-3 items-start bg-card/50 p-4 rounded-2xl border border-border/60 shadow-sm hover:border-primary/20 transition-all group" {...props}>
-                              <span className="mt-1.5 w-1.5 h-1.5 rounded-full bg-blue-500 flex-shrink-0 group-hover:scale-125 transition-transform" /> 
-                              <span className="flex-1 text-sm font-medium leading-relaxed text-foreground/90">{props.children}</span>
-                            </li>
-                          ),
-                          p: ({node, ...props}) => <p className="mb-3 last:mb-0" {...props} />,
-                          strong: ({node, ...props}) => <span className="font-bold text-primary" {...props} />
-                        }}
-                     >
-                        {result.remedy.chemicalSolution}
-                     </ReactMarkdown>
-                  </div>
-               </div>
+              <div className="bg-card rounded-[2rem] p-6 border border-border shadow-sm min-h-[140px] flex flex-col justify-center relative">
+                <div className="absolute top-4 right-4">
+                  <Button
+                    size="icon"
+                    variant="ghost"
+                    className="rounded-full bg-primary/5 hover:bg-primary/10 text-primary"
+                    onClick={() => speakText(result.remedy.chemicalSolution)}
+                  >
+                    <Volume2 className="w-5 h-5" />
+                  </Button>
+                </div>
+                <h4 className="font-bold text-foreground mb-2 flex items-center gap-2">
+                  <span className="w-2 h-2 rounded-full bg-blue-500" />
+                  Recommended Action
+                </h4>
+                <div className="text-muted-foreground leading-relaxed">
+                  <ReactMarkdown
+                    components={{
+                      ul: ({ node, ...props }) => <ul className="space-y-4 my-3" {...props} />,
+                      li: ({ node, ...props }) => (
+                        <li className="flex gap-3 items-start bg-card/50 p-4 rounded-2xl border border-border/60 shadow-sm hover:border-primary/20 transition-all group" {...props}>
+                          <span className="mt-1.5 w-1.5 h-1.5 rounded-full bg-blue-500 flex-shrink-0 group-hover:scale-125 transition-transform" />
+                          <span className="flex-1 text-sm font-medium leading-relaxed text-foreground/90">{props.children}</span>
+                        </li>
+                      ),
+                      p: ({ node, ...props }) => <p className="mb-3 last:mb-0" {...props} />,
+                      strong: ({ node, ...props }) => <span className="font-bold text-primary" {...props} />
+                    }}
+                  >
+                    {result.remedy.chemicalSolution}
+                  </ReactMarkdown>
+                </div>
+              </div>
             </TabsContent>
 
             <TabsContent value="organic" className="mt-4">
-               <div className="bg-card rounded-[2rem] p-6 border border-border shadow-sm min-h-[140px] flex flex-col justify-center relative">
-                  <div className="absolute top-4 right-4">
-                     <Button
-                        size="icon"
-                        variant="ghost"
-                        className="rounded-full bg-primary/5 hover:bg-primary/10 text-primary"
-                        onClick={() => speakText(result.remedy.organicSolution)}
-                     >
-                       <Volume2 className="w-5 h-5" />
-                     </Button>
-                  </div>
-                  <h4 className="font-bold text-foreground mb-2 flex items-center gap-2">
-                     <span className="w-2 h-2 rounded-full bg-green-500" />
-                     Organic Solution
-                  </h4>
-                  <div className="text-muted-foreground leading-relaxed">
-                     <ReactMarkdown
-                        components={{
-                          ul: ({node, ...props}) => <ul className="space-y-4 my-3" {...props} />,
-                          li: ({node, ...props}) => (
-                            <li className="flex gap-3 items-start bg-card/50 p-4 rounded-2xl border border-border/60 shadow-sm hover:border-green-500/30 transition-all group" {...props}>
-                               <span className="mt-1.5 w-1.5 h-1.5 rounded-full bg-green-500 flex-shrink-0 group-hover:scale-125 transition-transform" />
-                               <span className="flex-1 text-sm font-medium leading-relaxed text-foreground/90">{props.children}</span>
-                            </li>
-                          ),
-                          p: ({node, ...props}) => <p className="mb-3 last:mb-0" {...props} />,
-                          strong: ({node, ...props}) => <span className="font-bold text-green-600 dark:text-green-400" {...props} />
-                        }}
-                     >
-                        {result.remedy.organicSolution}
-                     </ReactMarkdown>
-                  </div>
-               </div>
+              <div className="bg-card rounded-[2rem] p-6 border border-border shadow-sm min-h-[140px] flex flex-col justify-center relative">
+                <div className="absolute top-4 right-4">
+                  <Button
+                    size="icon"
+                    variant="ghost"
+                    className="rounded-full bg-primary/5 hover:bg-primary/10 text-primary"
+                    onClick={() => speakText(result.remedy.organicSolution)}
+                  >
+                    <Volume2 className="w-5 h-5" />
+                  </Button>
+                </div>
+                <h4 className="font-bold text-foreground mb-2 flex items-center gap-2">
+                  <span className="w-2 h-2 rounded-full bg-green-500" />
+                  Organic Solution
+                </h4>
+                <div className="text-muted-foreground leading-relaxed">
+                  <ReactMarkdown
+                    components={{
+                      ul: ({ node, ...props }) => <ul className="space-y-4 my-3" {...props} />,
+                      li: ({ node, ...props }) => (
+                        <li className="flex gap-3 items-start bg-card/50 p-4 rounded-2xl border border-border/60 shadow-sm hover:border-green-500/30 transition-all group" {...props}>
+                          <span className="mt-1.5 w-1.5 h-1.5 rounded-full bg-green-500 flex-shrink-0 group-hover:scale-125 transition-transform" />
+                          <span className="flex-1 text-sm font-medium leading-relaxed text-foreground/90">{props.children}</span>
+                        </li>
+                      ),
+                      p: ({ node, ...props }) => <p className="mb-3 last:mb-0" {...props} />,
+                      strong: ({ node, ...props }) => <span className="font-bold text-green-600 dark:text-green-400" {...props} />
+                    }}
+                  >
+                    {result.remedy.organicSolution}
+                  </ReactMarkdown>
+                </div>
+              </div>
             </TabsContent>
           </Tabs>
         </motion.div>
 
         {/* Prevention Tip */}
         <motion.div
-           initial={{ y: 20, opacity: 0 }}
-           animate={{ y: 0, opacity: 1 }}
-           transition={{ delay: 0.7 }}
-           className="bg-gradient-to-br from-indigo-50 to-blue-50 dark:from-indigo-950/30 dark:to-blue-900/20 rounded-[2rem] p-6 border border-indigo-100 dark:border-indigo-800/50"
+          initial={{ y: 20, opacity: 0 }}
+          animate={{ y: 0, opacity: 1 }}
+          transition={{ delay: 0.7 }}
+          className="bg-gradient-to-br from-indigo-50 to-blue-50 dark:from-indigo-950/30 dark:to-blue-900/20 rounded-[2rem] p-6 border border-indigo-100 dark:border-indigo-800/50"
         >
-           <div className="flex items-start gap-4">
-              <div className="w-12 h-12 rounded-2xl bg-indigo-100 dark:bg-indigo-900/50 flex items-center justify-center flex-shrink-0 text-indigo-600 dark:text-indigo-300">
-                 <ShieldCheck className="w-6 h-6" />
+          <div className="flex items-start gap-4">
+            <div className="w-12 h-12 rounded-2xl bg-indigo-100 dark:bg-indigo-900/50 flex items-center justify-center flex-shrink-0 text-indigo-600 dark:text-indigo-300">
+              <ShieldCheck className="w-6 h-6" />
+            </div>
+            <div className="flex-1 min-w-0">
+              <h3 className="font-bold text-foreground mb-1">{t('prevention')}</h3>
+              <div className="text-sm text-muted-foreground leading-relaxed">
+                <ReactMarkdown
+                  components={{
+                    ul: ({ node, ...props }) => <ul className="space-y-3 my-2" {...props} />,
+                    li: ({ node, ...props }) => (
+                      <li className="flex gap-3 items-start bg-white/40 dark:bg-black/20 p-3 rounded-xl border border-indigo-200/50 dark:border-indigo-800/30" {...props}>
+                        <ShieldCheck className="w-4 h-4 text-indigo-500 mt-0.5 flex-shrink-0" />
+                        <span className="flex-1 font-medium">{props.children}</span>
+                      </li>
+                    ),
+                    strong: ({ node, ...props }) => <span className="font-bold text-indigo-700 dark:text-indigo-300" {...props} />
+                  }}
+                >
+                  {result.remedy.prevention}
+                </ReactMarkdown>
               </div>
-              <div className="flex-1 min-w-0">
-                 <h3 className="font-bold text-foreground mb-1">{t('prevention')}</h3>
-                 <div className="text-sm text-muted-foreground leading-relaxed">
-                    <ReactMarkdown
-                        components={{
-                          ul: ({node, ...props}) => <ul className="space-y-3 my-2" {...props} />,
-                          li: ({node, ...props}) => (
-                            <li className="flex gap-3 items-start bg-white/40 dark:bg-black/20 p-3 rounded-xl border border-indigo-200/50 dark:border-indigo-800/30" {...props}>
-                               <ShieldCheck className="w-4 h-4 text-indigo-500 mt-0.5 flex-shrink-0" />
-                               <span className="flex-1 font-medium">{props.children}</span>
-                            </li>
-                          ),
-                           strong: ({node, ...props}) => <span className="font-bold text-indigo-700 dark:text-indigo-300" {...props} />
-                        }}
-                    >
-                        {result.remedy.prevention}
-                    </ReactMarkdown>
-                 </div>
-              </div>
-           </div>
+            </div>
+          </div>
         </motion.div>
       </div>
 

@@ -31,13 +31,17 @@ const CommentSection = ({ comments, isLoading, onAddComment, onDeleteComment, is
   const canDelete = (comment: ForumComment) => {
     if (!user) return false;
 
-    // Check IDs first (most secure)
-    if (user.uid === comment.user_id || user.uid === postAuthorId) return true;
+    // 1. Check if I am the comment author (ID match - Most Secure)
+    if (user.uid === comment.user_id) return true;
 
-    // Fallback: Check names (useful if account was reset/dev environment)
+    // 2. Check if I am the comment author (Name match - Fallback for reset accounts)
+    // We strictly filter out generic names to avoid name collisions
     const userName = user.displayName || user.email?.split('@')[0] || '';
-    if (userName && comment.author_name === userName) return true;
-    if (userName && postAuthorName === userName) return true;
+    const GENERIC_NAMES = ['Farmer', 'Guest', 'Anonymous', 'User', 'Admin', 'undefined', 'null'];
+
+    if (userName && !GENERIC_NAMES.includes(userName) && comment.author_name === userName) {
+      return true;
+    }
 
     return false;
   };

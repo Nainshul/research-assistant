@@ -4,7 +4,8 @@ import { DiagnosisResult } from '@/types/diagnosis';
 export const analyzeWithGemini = async (
   imageBase64: string,
   apiKey: string,
-  language: string = 'en'
+  language: string = 'en',
+  weatherContext?: string
 ): Promise<DiagnosisResult> => {
   try {
     // Initialize the API
@@ -48,8 +49,15 @@ export const analyzeWithGemini = async (
         styleInstruction = "Language: English. Professional and clear.";
     }
 
+    const weatherPrompt = weatherContext ? `
+    ENVIRONMENTAL CONTEXT:
+    ${weatherContext}
+    Consider this weather data when recommending treatments (e.g., if raining, avoid certain sprays; if humid, warn about fungi).
+    ` : '';
+
     const prompt = `
     You are an expert agronomist. Analyze this image of a plant.
+    ${weatherPrompt}
     
     1. Identify the specific Plant/Crop name.
     2. Detect if it has any disease or pests.
@@ -89,10 +97,10 @@ export const analyzeWithGemini = async (
 
     const response = await result.response;
     const text = response.text();
-    
+
     // Clean markdown code blocks if present (Gemini often adds ```json ... ```)
     const cleanText = text.replace(/```json/g, '').replace(/```/g, '').trim();
-    
+
     const parsedContent = JSON.parse(cleanText);
 
     if (!parsedContent.isPlant) {
@@ -117,18 +125,60 @@ export const analyzeWithGemini = async (
 
   } catch (error: any) {
     console.error('Gemini Analysis Failed - Full details:', error);
-    
+
     // Log extended details if available
     if (error.response) {
-        console.error('Error Response:', error.response);
-        const text = await error.response.text().catch(() => 'No response body');
-        console.error('Error Body:', text);
+      console.error('Error Response:', error.response);
+      const text = await error.response.text().catch(() => 'No response body');
+      console.error('Error Body:', text);
     }
-    
+
     // Improve error message for 404/403
     if (error.message?.includes('404') || error.message?.includes('not found')) {
-        throw new Error(`Gemini Error (404): Model not found. This might be a Region issue or API Key issue. Original Error: ${error.message}`);
+      throw new Error(`Gemini Error (404): Model not found. This might be a Region issue or API Key issue. Original Error: ${error.message}`);
     }
     throw new Error(error.message || "AI Analysis failed.");
+  }
+};
+
+export const generateChatResponse = async (
+  context: { disease: string; crop: string; history: { role: 'user' | 'ai'; text: string }[] },
+  query: string,
+  apiKey: string
+): Promise<string> => {
+  try {
+    const genAI = new GoogleGenerativeAI(apiKey);
+    const model = genAI.getGenerativeModel({ model: "gemini-2.5-flash" });
+
+    // Construct history for the model
+    const chat = model.startChat({
+      history: [
+        {
+          role: "user",
+          parts: [{
+            text: `System Context: The user is an Indian farmer. They have scanned a ${context.crop} plant which has been diagnosed with ${context.disease}. 
+          You are an expert agronomist assistant. 
+          Respond to their questions specifically about this situation. 
+          Keep answers short (under 50 words), practical, and encouraging. 
+          Use emojis.` }]
+        },
+        {
+          role: "model",
+          parts: [{ text: `Namaste! I am your farm assistant. I see your ${context.crop} has ${context.disease}. How can I help you manage this?` }]
+        },
+        ...context.history.map(msg => ({
+          role: msg.role === 'user' ? 'user' : 'model',
+          parts: [{ text: msg.text }]
+        }))
+      ]
+    });
+
+    const result = await chat.sendMessage(query);
+    const response = await result.response;
+    return response.text();
+
+  } catch (error: any) {
+    console.error("Gemini Chat Error:", error);
+    return "I'm having trouble connecting right now. Please check your internet or try again.";
   }
 };

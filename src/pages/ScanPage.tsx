@@ -3,6 +3,7 @@ import AppLayout from '@/components/layout/AppLayout';
 import CameraView from '@/components/scanner/CameraView';
 import AnalyzingView from '@/components/scanner/AnalyzingView';
 import ResultCard from '@/components/scanner/ResultCard';
+import CropAssistant from '@/components/scanner/CropAssistant';
 import { useDiagnosis } from '@/hooks/useDiagnosis';
 import { usePlantModel } from '@/hooks/usePlantModel';
 import { useScans } from '@/hooks/useScans';
@@ -10,8 +11,9 @@ import { useOfflineSync } from '@/hooks/useOfflineSync';
 import { useAuth } from '@/contexts/AuthContext';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Progress } from '@/components/ui/progress';
-import { AlertCircle, Download, Cloud, WifiOff, Sparkles, Loader2 } from 'lucide-react';
+import { AlertCircle, Download, Cloud, WifiOff, Sparkles, Loader2, CloudSun, Thermometer } from 'lucide-react';
 import { Button } from '@/components/ui/button';
+import { useWeather } from '@/hooks/useWeather';
 import { motion, AnimatePresence } from 'framer-motion';
 import { toast } from 'sonner';
 
@@ -26,11 +28,19 @@ const ScanPage = () => {
   const { uploadImage, saveScan } = useScans();
   const { isOnline, addPendingScan } = useOfflineSync();
   const { user } = useAuth();
+  const { weather } = useWeather();
 
   const handleCapture = async (imageDataUrl: string) => {
     setCapturedImage(imageDataUrl);
     setScanState('analyzing');
-    await analyzeImage(imageDataUrl);
+
+    // Format weather context if available
+    let weatherContextString = undefined;
+    if (weather) {
+      weatherContextString = `Temperature: ${weather.temperature}°C, Humidity: ${weather.humidity}%, Condition: ${weather.isRaining ? 'Raining' : 'Clear/Cloudy'}`;
+    }
+
+    await analyzeImage(imageDataUrl, undefined, weatherContextString);
     setScanState('result');
   };
 
@@ -136,6 +146,14 @@ const ScanPage = () => {
 
       {scanState === 'camera' && (
         <div className={`h-[calc(100dvh-5rem)] ${modelError ? 'pt-12' : ''} relative`}> {/* 100dvh - header/nav space */}
+          {weather && (
+            <div className="absolute top-4 left-4 z-30 bg-black/40 backdrop-blur-md px-3 py-1.5 rounded-full flex items-center gap-2 border border-white/10 animate-in fade-in slide-in-from-top-2">
+              {weather.isRaining ? <CloudSun className="w-4 h-4 text-blue-300" /> : <Thermometer className="w-4 h-4 text-orange-300" />}
+              <span className="text-xs font-medium text-white shadow-sm">
+                {weather.temperature}°C • {weather.humidity}%
+              </span>
+            </div>
+          )}
           <CameraView
             onCapture={handleCapture}
             onFileUpload={handleCapture}

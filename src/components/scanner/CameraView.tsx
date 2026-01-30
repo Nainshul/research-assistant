@@ -21,13 +21,13 @@ const CameraView = ({ onCapture, onFileUpload }: CameraViewProps) => {
 
   const handleCapture = useCallback(() => {
     if (!isStreaming || isCapturing) return;
-    
+
     setIsCapturing(true);
     setShowFlash(true);
-    
+
     // Flash effect
     setTimeout(() => setShowFlash(false), 150);
-    
+
     // Capture after brief delay for feedback
     setTimeout(() => {
       const imageData = captureImage();
@@ -41,23 +41,23 @@ const CameraView = ({ onCapture, onFileUpload }: CameraViewProps) => {
   const handleVoiceCommand = useCallback((command: string) => {
     setShowVoiceFeedback(true);
     setTimeout(() => setShowVoiceFeedback(false), 1000);
-    
+
     toast({
       title: "Voice Command",
       description: `Detected: "${command.trim()}"`,
       duration: 1500,
     });
-    
+
     handleCapture();
   }, [handleCapture, toast]);
 
-  const { 
-    isListening, 
-    isSupported: isSpeechSupported, 
+  const {
+    isListening,
+    isSupported: isSpeechSupported,
     transcript,
     error: speechError,
-    startListening, 
-    stopListening 
+    startListening,
+    stopListening
   } = useSpeechRecognition({
     onCommand: handleVoiceCommand,
     triggerWords: ['scan', 'capture', 'photo', 'click', 'take', 'shoot', 'snap'],
@@ -91,9 +91,71 @@ const CameraView = ({ onCapture, onFileUpload }: CameraViewProps) => {
     setVoiceEnabled(!voiceEnabled);
   };
 
-  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const validateImage = (file: File): Promise<boolean> => {
+    return new Promise((resolve) => {
+      // 1. Check File Size
+      const MIN_FILE_SIZE = 10 * 1024; // 10KB
+      const MAX_FILE_SIZE = 10 * 1024 * 1024; // 10MB
+
+      if (file.size < MIN_FILE_SIZE) {
+        toast({
+          title: "Image too small",
+          description: "Please upload an image larger than 10KB for better results.",
+          variant: "destructive",
+        });
+        resolve(false);
+        return;
+      }
+
+      if (file.size > MAX_FILE_SIZE) {
+        toast({
+          title: "Image too large",
+          description: "Please upload an image smaller than 10MB.",
+          variant: "destructive",
+        });
+        resolve(false);
+        return;
+      }
+
+      // 2. Check Dimensions
+      const MIN_DIMENSION = 200;
+      const img = new Image();
+      img.onload = () => {
+        if (img.width < MIN_DIMENSION || img.height < MIN_DIMENSION) {
+          toast({
+            title: "Low Resolution",
+            description: `Image must be at least ${MIN_DIMENSION}x${MIN_DIMENSION} pixels.`,
+            variant: "destructive",
+          });
+          resolve(false);
+        } else {
+          resolve(true); // Valid
+        }
+        URL.revokeObjectURL(img.src);
+      };
+      img.onerror = () => {
+        toast({
+          title: "Invalid Image",
+          description: "Could not read the image file.",
+          variant: "destructive",
+        });
+        resolve(false);
+        URL.revokeObjectURL(img.src);
+      };
+      img.src = URL.createObjectURL(file);
+    });
+  };
+
+  const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (file) {
+      // Validate before processing
+      const isValid = await validateImage(file);
+      if (!isValid) {
+        e.target.value = ''; // Reset input
+        return;
+      }
+
       const reader = new FileReader();
       reader.onload = (event) => {
         const result = event.target?.result;
@@ -159,7 +221,7 @@ const CameraView = ({ onCapture, onFileUpload }: CameraViewProps) => {
           >
             {/* Vignette effect */}
             <div className="absolute inset-0 bg-gradient-radial from-transparent via-transparent to-black/50" />
-            
+
             {/* Scan frame */}
             <div className="absolute inset-0 flex items-center justify-center">
               <div className="relative w-72 h-72">
@@ -213,7 +275,7 @@ const CameraView = ({ onCapture, onFileUpload }: CameraViewProps) => {
             </div>
 
             {/* Grid pattern overlay */}
-            <div 
+            <div
               className="absolute inset-0 opacity-10"
               style={{
                 backgroundImage: `
@@ -255,11 +317,10 @@ const CameraView = ({ onCapture, onFileUpload }: CameraViewProps) => {
               onClick={toggleVoice}
               whileHover={{ scale: 1.05 }}
               whileTap={{ scale: 0.95 }}
-              className={`flex items-center gap-2 px-3 py-2 rounded-full backdrop-blur-md border transition-all ${
-                voiceEnabled 
-                  ? 'bg-primary/80 border-primary text-primary-foreground' 
-                  : 'bg-black/60 border-white/10 text-white/90'
-              }`}
+              className={`flex items-center gap-2 px-3 py-2 rounded-full backdrop-blur-md border transition-all ${voiceEnabled
+                ? 'bg-primary/80 border-primary text-primary-foreground'
+                : 'bg-black/60 border-white/10 text-white/90'
+                }`}
             >
               {voiceEnabled ? (
                 <>
@@ -312,9 +373,9 @@ const CameraView = ({ onCapture, onFileUpload }: CameraViewProps) => {
                         key={i}
                         className="w-1 bg-primary rounded-full"
                         animate={{ height: [8, 16, 8] }}
-                        transition={{ 
-                          duration: 0.5, 
-                          repeat: Infinity, 
+                        transition={{
+                          duration: 0.5,
+                          repeat: Infinity,
                           delay: i * 0.1,
                           ease: "easeInOut"
                         }}
@@ -351,7 +412,7 @@ const CameraView = ({ onCapture, onFileUpload }: CameraViewProps) => {
       <div className="absolute bottom-0 left-0 right-0 pb-8 pt-20 bg-gradient-to-t from-black via-black/80 to-transparent">
         <div className="flex items-center justify-center gap-8 px-6">
           {/* Gallery upload */}
-          <motion.label 
+          <motion.label
             whileHover={{ scale: 1.05 }}
             whileTap={{ scale: 0.95 }}
             className="touch-target w-14 h-14 rounded-full bg-white/10 backdrop-blur-md flex items-center justify-center cursor-pointer border border-white/20 hover:bg-white/20 transition-colors"
@@ -376,13 +437,13 @@ const CameraView = ({ onCapture, onFileUpload }: CameraViewProps) => {
           >
             {/* Outer ring */}
             <div className="absolute inset-0 rounded-full border-4 border-white" />
-            
+
             {/* Inner circle */}
-            <motion.div 
+            <motion.div
               className="absolute inset-2 rounded-full bg-white"
               animate={isCapturing ? { scale: 0.8 } : { scale: 1 }}
             />
-            
+
             {/* Pulse effect */}
             <motion.div
               className="absolute inset-0 rounded-full border-2 border-primary"
@@ -396,11 +457,10 @@ const CameraView = ({ onCapture, onFileUpload }: CameraViewProps) => {
             onClick={toggleVoice}
             whileHover={{ scale: 1.05 }}
             whileTap={{ scale: 0.95 }}
-            className={`touch-target w-14 h-14 rounded-full backdrop-blur-md flex items-center justify-center border transition-colors ${
-              voiceEnabled 
-                ? 'bg-primary/80 border-primary' 
-                : 'bg-white/10 border-white/20 hover:bg-white/20'
-            }`}
+            className={`touch-target w-14 h-14 rounded-full backdrop-blur-md flex items-center justify-center border transition-colors ${voiceEnabled
+              ? 'bg-primary/80 border-primary'
+              : 'bg-white/10 border-white/20 hover:bg-white/20'
+              }`}
           >
             {voiceEnabled ? (
               <Mic className="w-6 h-6 text-primary-foreground" />
@@ -411,12 +471,17 @@ const CameraView = ({ onCapture, onFileUpload }: CameraViewProps) => {
         </div>
 
         {/* Quick tip */}
-        <p className="text-center text-white/50 text-xs mt-4">
-          {voiceEnabled 
-            ? 'Say "scan" or "capture" • Tap to scan' 
-            : 'Tap to scan • Enable voice for hands-free'
-          }
-        </p>
+        <div className="flex flex-col items-center mt-4 space-y-[2px]">
+          <p className="text-center text-white/50 text-xs">
+            {voiceEnabled
+              ? 'Say "scan" or "capture" • Tap to scan'
+              : 'Tap to scan • Enable voice for hands-free'
+            }
+          </p>
+          <p className="text-xs text-white/50 font-medium">
+            Max 10MB • Min 10KB
+          </p>
+        </div>
       </div>
     </div>
   );

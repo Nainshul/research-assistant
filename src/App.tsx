@@ -18,6 +18,7 @@ import VerifyEmailPage from "./pages/VerifyEmailPage";
 import HistoryPage from "./pages/HistoryPage";
 import SettingsPage from "./pages/SettingsPage";
 import NotFound from "./pages/NotFound";
+import CalendarPage from "./pages/CalendarPage";
 
 const queryClient = new QueryClient();
 
@@ -41,6 +42,11 @@ const App = () => (
                 <RequireVerifiedEmail>
                   <CommunityPage />
                 </RequireVerifiedEmail>
+              } />
+              <Route path="/calendar" element={
+                <RequireAuth>
+                  <CalendarPage />
+                </RequireAuth>
               } />
               <Route path="/profile" element={<ProfilePage />} />
               <Route path="/auth" element={<AuthPage />} />

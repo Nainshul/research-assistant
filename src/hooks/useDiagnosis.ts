@@ -15,7 +15,7 @@ interface UseDiagnosisReturn {
   isAnalyzing: boolean;
   result: DiagnosisResult | null;
   error: string | null;
-  analyzeImage: (imageDataUrl: string, languageOverride?: string) => Promise<void>;
+  analyzeImage: (imageDataUrl: string, languageOverride?: string, weatherContext?: string) => Promise<void>;
   clearResult: () => void;
   usingGemini: boolean;
 }
@@ -25,12 +25,12 @@ export const useDiagnosis = (): UseDiagnosisReturn => {
   const [result, setResult] = useState<DiagnosisResult | null>(null);
   const [error, setError] = useState<string | null>(null);
   const { language } = useLanguage();
-  
+
   // Use Environment Variable for API Key
   const GEMINI_KEY = import.meta.env.VITE_GEMINI_API_KEY;
   const usingGemini = !!GEMINI_KEY;
 
-  const analyzeImage = useCallback(async (imageDataUrl: string, languageOverride?: string) => {
+  const analyzeImage = useCallback(async (imageDataUrl: string, languageOverride?: string, weatherContext?: string) => {
     setIsAnalyzing(true);
     setError(null);
     setResult(null);
@@ -42,7 +42,7 @@ export const useDiagnosis = (): UseDiagnosisReturn => {
       // MODE 1: Gemini API (Cloud)
       try {
         console.log(`Using Gemini AI for analysis in ${currentLanguage}...`);
-        const geminiResult = await analyzeWithGemini(imageDataUrl, GEMINI_KEY, currentLanguage);
+        const geminiResult = await analyzeWithGemini(imageDataUrl, GEMINI_KEY, currentLanguage, weatherContext);
         setResult(geminiResult);
       } catch (err: any) {
         console.error('Gemini Error:', err);
