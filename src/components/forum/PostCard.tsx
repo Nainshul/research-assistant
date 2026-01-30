@@ -162,6 +162,8 @@ const PostCard = ({ post, onLike, onDelete, onEdit, isDeleting }: PostCardProps)
               onAddComment={createComment}
               onDeleteComment={deleteComment}
               isCreating={isCreating}
+              postAuthorId={post.user_id}
+              postAuthorName={post.author_name}
             />
           )}
         </CardFooter>

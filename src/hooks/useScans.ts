@@ -1,9 +1,9 @@
-import { useState, useEffect } from 'react';
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { db, storage } from '@/lib/firebase';
-import { collection, query, where, getDocs, addDoc, deleteDoc, orderBy, doc, Timestamp } from 'firebase/firestore';
+import { collection, query, where, getDocs, addDoc, deleteDoc, doc } from 'firebase/firestore';
 import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
 import { useAuth } from '@/contexts/AuthContext';
-import { useToast } from '@/hooks/use-toast';
+import { toast } from 'sonner';
 
 export interface Scan {
   id: string;
@@ -19,18 +19,13 @@ export interface Scan {
 
 export const useScans = () => {
   const { user } = useAuth();
-  const { toast } = useToast();
-  const [scans, setScans] = useState<Scan[]>([]);
-  const [isLoading, setIsLoading] = useState(true);
+  const queryClient = useQueryClient();
 
-  const fetchScans = async () => {
-    if (!user) {
-      setScans([]);
-      setIsLoading(false);
-      return;
-    }
+  const { data: scans = [], isLoading } = useQuery({
+    queryKey: ['scans', user?.uid],
+    queryFn: async () => {
+      if (!user) return [];
 
-    try {
       const q = query(
         collection(db, 'scans'),
         where('user_id', '==', user.uid)
@@ -49,62 +44,45 @@ export const useScans = () => {
           confidence_score: data.confidence_score,
           geo_lat: data.geo_lat,
           geo_long: data.geo_long,
-          created_at: data.created_at, // Assuming stored as ISO string or timestamp converted to string
+          created_at: data.created_at,
         });
       });
 
       // Sort client-side
-      fetchedScans.sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
+      return fetchedScans.sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
+    },
+    enabled: !!user,
+  });
 
-      setScans(fetchedScans);
-    } catch (error) {
-      console.error('Error fetching scans:', error);
-    } finally {
-      setIsLoading(false);
-    }
-  };
+  const uploadImageMutation = useMutation({
+    mutationFn: async (imageDataUrl: string) => {
+      if (!user) throw new Error('User not authenticated');
 
-  useEffect(() => {
-    fetchScans();
-  }, [user]);
-
-  const uploadImage = async (imageDataUrl: string): Promise<string | null> => {
-    if (!user) return null;
-
-    try {
-      // Convert data URL to blob
       const response = await fetch(imageDataUrl);
       const blob = await response.blob();
-
-      // Generate unique filename
       const fileName = `${user.uid}/${Date.now()}.jpg`;
       const storageRef = ref(storage, `scan-images/${fileName}`);
 
       await uploadBytes(storageRef, blob);
-      const publicUrl = await getDownloadURL(storageRef);
-
-      return publicUrl;
-    } catch (error) {
+      return await getDownloadURL(storageRef);
+    },
+    onError: (error: any) => {
       console.error('Error uploading image:', error);
-      toast({
-        title: 'Upload failed',
-        description: 'Could not save image to cloud',
-        variant: 'destructive',
+      toast.error('Upload failed', {
+        description: error.message || 'Could not save image to cloud',
       });
-      return null;
     }
-  };
+  });
 
-  const saveScan = async (
-    imageUrl: string,
-    diseaseDetected: string,
-    cropName: string | null,
-    confidenceScore: number
-  ): Promise<Scan | null> => {
-    if (!user) return null;
+  const saveScanMutation = useMutation({
+    mutationFn: async (data: {
+      imageUrl: string;
+      diseaseDetected: string;
+      cropName: string | null;
+      confidenceScore: number;
+    }) => {
+      if (!user) throw new Error('User not authenticated');
 
-    try {
-      // Try to get geolocation
       let geoLat: number | null = null;
       let geoLong: number | null = null;
 
@@ -117,73 +95,65 @@ export const useScans = () => {
           geoLong = position.coords.longitude;
         } catch {
           // Geolocation not available or denied
+          console.log('Geolocation access denied or timed out');
         }
       }
 
       const scanData = {
         user_id: user.uid,
-        image_url: imageUrl,
-        disease_detected: diseaseDetected,
-        crop_name: cropName,
-        confidence_score: confidenceScore,
+        image_url: data.imageUrl,
+        disease_detected: data.diseaseDetected,
+        crop_name: data.cropName,
+        confidence_score: data.confidenceScore,
         geo_lat: geoLat,
         geo_long: geoLong,
         created_at: new Date().toISOString(),
       };
 
       const docRef = await addDoc(collection(db, 'scans'), scanData);
-
-      const newScan: Scan = {
-        id: docRef.id,
-        ...scanData
-      };
-
-      // Update local state
-      setScans(prev => [newScan, ...prev]);
-
-      toast({
-        title: 'Scan saved',
+      return { id: docRef.id, ...scanData } as Scan;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['scans', user?.uid] });
+      toast.success('Scan saved', {
         description: 'Your diagnosis has been saved to your history',
       });
-
-      return newScan;
-    } catch (error) {
+    },
+    onError: (error: any) => {
       console.error('Error saving scan:', error);
-      toast({
-        title: 'Save failed',
-        description: 'Could not save scan to cloud',
-        variant: 'destructive',
+      toast.error('Save failed', {
+        description: error.message || 'Could not save scan to cloud',
       });
-      return null;
     }
-  };
+  });
 
-  const deleteScan = async (scanId: string) => {
-    try {
+  const deleteScanMutation = useMutation({
+    mutationFn: async (scanId: string) => {
       await deleteDoc(doc(db, 'scans', scanId));
-
-      setScans(prev => prev.filter(s => s.id !== scanId));
-
-      toast({
-        title: 'Scan deleted',
+      return scanId;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['scans', user?.uid] });
+      toast.success('Scan deleted', {
         description: 'The scan has been removed from your history',
       });
-    } catch (error) {
+    },
+    onError: (error: any) => {
       console.error('Error deleting scan:', error);
-      toast({
-        title: 'Delete failed',
-        description: 'Could not delete scan',
-        variant: 'destructive',
+      toast.error('Delete failed', {
+        description: error.message || 'Could not delete scan',
       });
     }
-  };
+  });
 
   return {
     scans,
     isLoading,
-    uploadImage,
-    saveScan,
-    deleteScan,
-    refetch: fetchScans,
+    uploadImage: uploadImageMutation.mutateAsync,
+    saveScan: async (imageUrl: string, diseaseDetected: string, cropName: string | null, confidenceScore: number) => {
+      return await saveScanMutation.mutateAsync({ imageUrl, diseaseDetected, cropName, confidenceScore });
+    },
+    deleteScan: deleteScanMutation.mutateAsync,
+    refetch: () => queryClient.invalidateQueries({ queryKey: ['scans', user?.uid] }),
   };
 };

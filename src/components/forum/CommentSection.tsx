@@ -14,9 +14,11 @@ interface CommentSectionProps {
   onAddComment: (content: string) => void;
   onDeleteComment: (commentId: string) => void;
   isCreating: boolean;
+  postAuthorId: string;
+  postAuthorName?: string | null;
 }
 
-const CommentSection = ({ comments, isLoading, onAddComment, onDeleteComment, isCreating }: CommentSectionProps) => {
+const CommentSection = ({ comments, isLoading, onAddComment, onDeleteComment, isCreating, postAuthorId, postAuthorName }: CommentSectionProps) => {
   const { user } = useAuth();
   const [newComment, setNewComment] = useState('');
 
@@ -24,6 +26,20 @@ const CommentSection = ({ comments, isLoading, onAddComment, onDeleteComment, is
     if (!newComment.trim()) return;
     onAddComment(newComment.trim());
     setNewComment('');
+  };
+
+  const canDelete = (comment: ForumComment) => {
+    if (!user) return false;
+
+    // Check IDs first (most secure)
+    if (user.uid === comment.user_id || user.uid === postAuthorId) return true;
+
+    // Fallback: Check names (useful if account was reset/dev environment)
+    const userName = user.displayName || user.email?.split('@')[0] || '';
+    if (userName && comment.author_name === userName) return true;
+    if (userName && postAuthorName === userName) return true;
+
+    return false;
   };
 
   return (
@@ -61,14 +77,15 @@ const CommentSection = ({ comments, isLoading, onAddComment, onDeleteComment, is
                   </div>
                   <p className="text-sm text-muted-foreground mt-0.5">{comment.content}</p>
                 </div>
-                {user?.uid === comment.user_id && (
+                {canDelete(comment) && (
                   <Button
                     variant="ghost"
                     size="icon"
-                    className="h-6 w-6 text-muted-foreground hover:text-destructive self-start -mt-1"
+                    className="h-8 w-8 text-muted-foreground hover:text-destructive hover:bg-destructive/10 shrink-0"
                     onClick={() => onDeleteComment(comment.id)}
+                    title="Delete comment"
                   >
-                    <Trash2 className="h-3 w-3" />
+                    <Trash2 className="h-4 w-4" />
                   </Button>
                 )}
               </div>
