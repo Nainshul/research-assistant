@@ -18,7 +18,7 @@ import VerifyEmailPage from "./pages/VerifyEmailPage";
 import HistoryPage from "./pages/HistoryPage";
 import SettingsPage from "./pages/SettingsPage";
 import NotFound from "./pages/NotFound";
-import CalendarPage from "./pages/CalendarPage";
+import ChatbotPage from "./pages/ChatbotPage";
 
 const queryClient = new QueryClient();
 
@@ -43,9 +43,9 @@ const App = () => (
                   <CommunityPage />
                 </RequireVerifiedEmail>
               } />
-              <Route path="/calendar" element={
+              <Route path="/chat" element={
                 <RequireAuth>
-                  <CalendarPage />
+                  <ChatbotPage />
                 </RequireAuth>
               } />
               <Route path="/profile" element={<ProfilePage />} />

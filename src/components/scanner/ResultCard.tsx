@@ -164,32 +164,24 @@ const ResultCard = ({ result, onScanAgain, onLanguageChange }: ResultCardProps) 
             initial={{ x: -20, opacity: 0 }}
             animate={{ x: 0, opacity: 1 }}
             transition={{ delay: 0.2 }}
-            className={cn(
-              "inline-flex items-center gap-3 px-6 py-3 rounded-2xl mb-4 border backdrop-blur-md shadow-lg",
-              isHealthy
-                ? "bg-success/20 border-success/30 text-success-foreground"
-                : result.diseaseName === "No Crop Found"
-                  ? "bg-slate-500/20 border-slate-500/30 text-white"
-                  : "bg-destructive/20 border-destructive/30 text-red-700"
-            )}
+            className="mb-3"
           >
-            {isHealthy ? (
-              <CheckCircle2 className="w-6 h-6 text-success" />
-            ) : result.diseaseName === "No Crop Found" ? (
-              <AlertCircle className="w-6 h-6 text-slate-300" />
-            ) : (
-              <AlertTriangle className="w-6 h-6 text-red-700" />
-            )}
-            <span className={cn(
-              "text-lg font-extrabold tracking-wide",
-              isHealthy || result.diseaseName === "No Crop Found" ? "text-white" : "text-red-700"
-            )}>
-              {isHealthy
-                ? t('healthyPlant')
+            <div className={cn(
+              "inline-flex items-center gap-2 px-5 py-2.5 rounded-full shadow-lg backdrop-blur-md border",
+              isHealthy
+                ? "bg-green-500/10 text-green-500 border-green-500/20"
                 : result.diseaseName === "No Crop Found"
-                  ? t('noCropDetected')
-                  : t('diseaseDetected')}
-            </span>
+                  ? "bg-slate-500/10 text-slate-400 border-slate-500/20"
+                  : "bg-red-500/10 text-red-500 border-red-500/20 animate-pulse"
+            )}>
+              <h3 className="text-base font-black uppercase tracking-wider">
+                {isHealthy
+                  ? t('healthyPlant')
+                  : result.diseaseName === "No Crop Found"
+                    ? t('noCropDetected')
+                    : t('diseaseDetected')}
+              </h3>
+            </div>
           </motion.div>
 
           {/* Disease name & Crop */}
@@ -198,10 +190,10 @@ const ResultCard = ({ result, onScanAgain, onLanguageChange }: ResultCardProps) 
             animate={{ y: 0, opacity: 1 }}
             transition={{ delay: 0.3 }}
           >
-            <h1 className="text-3xl font-extrabold text-white mb-1 leading-none tracking-tight">
+            <h1 className="text-2xl font-extrabold text-white mb-1 leading-none tracking-tight">
               {result.diseaseName}
             </h1>
-            <p className="text-white/80 text-base font-medium flex items-center gap-2">
+            <p className="text-white/80 text-sm font-medium flex items-center gap-2">
               Detected on <span className="text-primary font-bold">{result.crop}</span>
             </p>
           </motion.div>
