@@ -1,7 +1,6 @@
 import { createContext, useContext, useState, useEffect, ReactNode } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
-import { db } from '@/lib/firebase';
-import { doc, getDoc, setDoc } from 'firebase/firestore';
+import { supabase } from '@/lib/supabase';
 
 export type Language = 'en' | 'hi' | 'hinglish' | 'ta' | 'te' | 'kn' | 'mr';
 
@@ -201,7 +200,6 @@ const translations: Record<Language, Record<string, string>> = {
     alreadyHaveAccount: 'ஏற்கனவே கணக்கு உள்ளதா?',
     dontHaveAccount: 'கணக்கு இல்லையா?',
 
-    // Result Card (English fallbacks/simple translations for now to avoid errors, ideally should be localized)
     chemical: 'இரசாயன சிகிச்சை',
     natural: 'இயற்கை சிகிச்சை',
     prevention: 'தடுப்பு குறிப்புகள்',
@@ -261,7 +259,6 @@ const translations: Record<Language, Record<string, string>> = {
     alreadyHaveAccount: 'ఇప్పటికే ఖాతా ఉందా?',
     dontHaveAccount: 'ఖాతా లేదా?',
 
-    // Result Card
     chemical: 'రసాయన చికిత్స',
     natural: 'సహజ చికిత్స',
     prevention: 'నివారణ చిట్కాలు',
@@ -321,7 +318,6 @@ const translations: Record<Language, Record<string, string>> = {
     alreadyHaveAccount: 'ಈಗಾಗಲೇ ಖಾತೆ ಇದೆಯೇ?',
     dontHaveAccount: 'ಖಾತೆ ಇಲ್ಲವೇ?',
 
-    // Result Card
     chemical: 'ರಾಸಾಯನಿಕ ಚಿಕಿತ್ಸೆ',
     natural: 'ನೈಸರ್ಗಿಕ ಚಿಕಿತ್ಸೆ',
     prevention: 'ತಡೆಗಟ್ಟುವ ಸಲಹೆಗಳು',
@@ -381,7 +377,6 @@ const translations: Record<Language, Record<string, string>> = {
     alreadyHaveAccount: 'आधीच खाते आहे का?',
     dontHaveAccount: 'खाते नाही का?',
 
-    // Result Card
     chemical: 'रासायनिक उपचार',
     natural: 'नैसर्गिक उपचार',
     prevention: 'प्रतिबंधात्मक टिप्स',
@@ -416,15 +411,15 @@ export const LanguageProvider = ({ children }: { children: ReactNode }) => {
     const loadLanguage = async () => {
       if (user) {
         try {
-          const docRef = doc(db, 'profiles', user.uid);
-          const docSnap = await getDoc(docRef);
+          const { data, error } = await supabase
+            .from('profiles')
+            .select('language_pref')
+            .eq('user_id', user.id)
+            .maybeSingle();
 
-          if (docSnap.exists()) {
-            const data = docSnap.data();
-            if (data?.language_pref && languages.some(l => l.code === data.language_pref)) {
-              setLanguageState(data.language_pref as Language);
-              return;
-            }
+          if (!error && data?.language_pref && languages.some(l => l.code === data.language_pref)) {
+            setLanguageState(data.language_pref as Language);
+            return;
           }
         } catch (e) {
           console.error("Failed to load language pref", e);
@@ -446,8 +441,12 @@ export const LanguageProvider = ({ children }: { children: ReactNode }) => {
 
     if (user) {
       try {
-        const docRef = doc(db, 'profiles', user.uid);
-        await setDoc(docRef, { language_pref: lang }, { merge: true });
+        await supabase
+          .from('profiles')
+          .upsert({
+            user_id: user.id,
+            language_pref: lang,
+          }, { onConflict: 'user_id' });
       } catch (e) {
         console.error("Failed to save language pref", e);
       }

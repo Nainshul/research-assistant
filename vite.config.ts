@@ -13,6 +13,16 @@ export default defineConfig(({ mode }) => ({
     host: "::",
     port: 8080,
   },
+  build: {
+    chunkSizeWarningLimit: 1500,
+    rollupOptions: {
+      output: {
+        manualChunks: {
+          capacitor: ['@capacitor/core', '@capacitor/app', '@capacitor/status-bar', '@capacitor/keyboard', '@capacitor/splash-screen'],
+        }
+      }
+    }
+  },
   plugins: [
     react(),
     basicSsl(),

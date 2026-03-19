@@ -6,27 +6,21 @@ import ResultCard from '@/components/scanner/ResultCard';
 import CropAssistant from '@/components/scanner/CropAssistant';
 import { useDiagnosis } from '@/hooks/useDiagnosis';
 import { usePlantModel } from '@/hooks/usePlantModel';
-import { useScans } from '@/hooks/useScans';
-import { useOfflineSync } from '@/hooks/useOfflineSync';
 import { useAuth } from '@/contexts/AuthContext';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Progress } from '@/components/ui/progress';
-import { AlertCircle, Download, Cloud, WifiOff, Sparkles, Loader2, CloudSun, Thermometer } from 'lucide-react';
+import { AlertCircle, Download, Sparkles, CloudSun, Thermometer } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { useWeather } from '@/hooks/useWeather';
 import { motion, AnimatePresence } from 'framer-motion';
-import { toast } from 'sonner';
 
 type ScanState = 'camera' | 'analyzing' | 'result';
 
 const ScanPage = () => {
   const [scanState, setScanState] = useState<ScanState>('camera');
   const [capturedImage, setCapturedImage] = useState<string | null>(null);
-  const [isSaving, setIsSaving] = useState(false);
   const { isAnalyzing, result, error: diagnosisError, analyzeImage, clearResult, usingGemini } = useDiagnosis();
   const { isLoading: isModelLoading, isReady: isModelReady, error: modelError, loadProgress, retry } = usePlantModel();
-  const { uploadImage, saveScan } = useScans();
-  const { isOnline, addPendingScan } = useOfflineSync();
   const { user } = useAuth();
   const { weather } = useWeather();
 
@@ -44,42 +38,7 @@ const ScanPage = () => {
     setScanState('result');
   };
 
-  // Save scan to cloud when result is available and user is logged in
-  const handleSaveToCloud = async () => {
-    if (!result || !capturedImage || !user) return;
 
-    setIsSaving(true);
-
-    try {
-      // If offline, save to pending queue
-      if (!isOnline) {
-        addPendingScan({
-          imageDataUrl: capturedImage,
-          diseaseName: result.diseaseName,
-          cropName: result.crop,
-          confidence: result.confidence,
-        });
-        toast.success('Scan saved locally - will sync when online');
-        return;
-      }
-
-      const imageUrl = await uploadImage(capturedImage);
-      if (imageUrl) {
-        await saveScan(
-          imageUrl,
-          result.diseaseName,
-          result.crop,
-          result.confidence
-        );
-        // Toast is handled in useScans now
-      }
-    } catch (error) {
-      console.error("Failed to save scan:", error);
-      // specific errors handled by useScans
-    } finally {
-      setIsSaving(false);
-    }
-  };
 
   const handleScanAgain = () => {
     setCapturedImage(null);
@@ -213,40 +172,6 @@ const ScanPage = () => {
                   }
                 }}
               />
-
-              {/* Cloud save button for logged in users */}
-              {user && (
-                <motion.div
-                  initial={{ opacity: 0, y: 20 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  transition={{ delay: 0.3 }}
-                  className="px-6 pb-24 safe-area-bottom"
-                >
-                  <Button
-                    variant="default"
-                    className="w-full h-12 rounded-xl text-base font-semibold shadow-lg shadow-primary/20"
-                    onClick={handleSaveToCloud}
-                    disabled={isSaving}
-                  >
-                    {isSaving ? (
-                      <>
-                        <Loader2 className="w-5 h-5 mr-2 animate-spin" />
-                        Saving...
-                      </>
-                    ) : isOnline ? (
-                      <>
-                        <Cloud className="w-5 h-5 mr-2" />
-                        Save to History
-                      </>
-                    ) : (
-                      <>
-                        <WifiOff className="w-5 h-5 mr-2" />
-                        Save Offline
-                      </>
-                    )}
-                  </Button>
-                </motion.div>
-              )}
             </>
           ) : (
             <div className="flex items-center justify-center h-full p-8">

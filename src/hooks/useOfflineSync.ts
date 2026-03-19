@@ -1,7 +1,5 @@
 import { useState, useEffect, useCallback } from 'react';
-import { db, storage } from '@/lib/firebase';
-import { collection, addDoc } from 'firebase/firestore';
-import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
+import { supabase } from '@/lib/supabase';
 import { useAuth } from '@/contexts/AuthContext';
 
 interface PendingScan {
@@ -10,6 +8,9 @@ interface PendingScan {
   diseaseName: string;
   cropName: string;
   confidence: number;
+  chemicalSolution?: string | null;
+  organicSolution?: string | null;
+  prevention?: string | null;
   createdAt: string;
 }
 
@@ -81,7 +82,7 @@ export const useOfflineSync = () => {
     return response.blob();
   };
 
-  // Sync all pending scans to Firebase
+  // Sync all pending scans to Supabase
   const syncPendingScans = useCallback(async () => {
     if (!user || !isOnline || pendingScans.length === 0 || isSyncing) {
       return { synced: 0, failed: 0 };
@@ -95,21 +96,36 @@ export const useOfflineSync = () => {
       try {
         // Upload image to storage
         const blob = await dataUrlToBlob(scan.imageDataUrl);
-        const fileName = `${user.uid}/${Date.now()}-${scan.id}.jpg`;
-        const storageRef = ref(storage, `scan-images/${fileName}`);
+        const fileName = `${user.id}/${Date.now()}-${scan.id}.jpg`;
 
-        await uploadBytes(storageRef, blob);
-        const publicUrl = await getDownloadURL(storageRef);
+        const { error: uploadError } = await supabase.storage
+          .from('photos')
+          .upload(`scan-images/${fileName}`, blob, {
+            contentType: 'image/jpeg',
+          });
+
+        if (uploadError) throw uploadError;
+
+        const { data: urlData } = supabase.storage
+          .from('photos')
+          .getPublicUrl(`scan-images/${fileName}`);
 
         // Save scan to database
-        await addDoc(collection(db, 'scans'), {
-          user_id: user.uid,
-          image_url: publicUrl,
-          disease_detected: scan.diseaseName,
-          crop_name: scan.cropName,
-          confidence_score: scan.confidence,
-          created_at: scan.createdAt,
-        });
+        const { error: insertError } = await supabase
+          .from('scans')
+          .insert({
+            user_id: user.id,
+            image_url: urlData.publicUrl,
+            disease_detected: scan.diseaseName,
+            crop_name: scan.cropName,
+            confidence_score: scan.confidence,
+            chemical_solution: scan.chemicalSolution || null,
+            organic_solution: scan.organicSolution || null,
+            prevention: scan.prevention || null,
+            created_at: scan.createdAt,
+          });
+
+        if (insertError) throw insertError;
 
         // Remove from pending queue on success
         removePendingScan(scan.id);

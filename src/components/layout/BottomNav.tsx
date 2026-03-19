@@ -1,4 +1,4 @@
-import { Home, MessageCircle, User, Camera, Calendar } from 'lucide-react';
+import { Home, MessageCircle, User, Camera } from 'lucide-react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { cn } from '@/lib/utils';
 
@@ -10,9 +10,8 @@ interface NavItem {
 
 const navItems: NavItem[] = [
   { icon: Home, label: 'Home', path: '/' },
-  { icon: MessageCircle, label: 'Chat', path: '/chat' },
   { icon: Camera, label: 'Scan', path: '/scan' },
-  { icon: MessageCircle, label: 'Community', path: '/community' },
+  { icon: MessageCircle, label: 'Chat', path: '/chat' },
   { icon: User, label: 'Profile', path: '/profile' },
 ];
 

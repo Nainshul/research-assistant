@@ -16,7 +16,7 @@ const VerifyEmailPage = () => {
 
   // Check verification status from Auth Context
   useEffect(() => {
-    if (user?.emailVerified) {
+    if (user?.email_confirmed_at) {
       setIsVerified(true);
       toast({
         title: 'Email verified!',

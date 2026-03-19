@@ -9,10 +9,11 @@ import { useToast } from '@/hooks/use-toast';
 interface CameraViewProps {
   onCapture: (imageDataUrl: string) => void;
   onFileUpload: (imageDataUrl: string) => void;
+  onReady?: () => void;
 }
 
-const CameraView = ({ onCapture, onFileUpload }: CameraViewProps) => {
-  const { videoRef, canvasRef, isStreaming, error, startCamera, stopCamera, captureImage } = useCamera();
+const CameraView = ({ onCapture, onFileUpload, onReady }: CameraViewProps) => {
+  const { videoRef, canvasRef, isStreaming, isInitializing, error, startCamera, stopCamera, captureImage } = useCamera();
   const [isCapturing, setIsCapturing] = useState(false);
   const [showFlash, setShowFlash] = useState(false);
   const [voiceEnabled, setVoiceEnabled] = useState(false);
@@ -78,6 +79,12 @@ const CameraView = ({ onCapture, onFileUpload }: CameraViewProps) => {
       stopListening();
     }
   }, [voiceEnabled, isSpeechSupported, startListening, stopListening]);
+
+  useEffect(() => {
+    if (isStreaming && onReady) {
+      onReady();
+    }
+  }, [isStreaming, onReady]);
 
   const toggleVoice = () => {
     if (!isSpeechSupported) {
@@ -168,9 +175,47 @@ const CameraView = ({ onCapture, onFileUpload }: CameraViewProps) => {
   };
 
   return (
-    <div className="relative w-full h-full bg-black overflow-hidden">
+    <div className="relative w-full h-full bg-[#0a0f0c] overflow-hidden">
       {/* Hidden canvas for capture */}
       <canvas ref={canvasRef} className="hidden" />
+
+      {/* Preparing / Loading State */}
+      <AnimatePresence>
+        {(isInitializing || !isStreaming) && !error && (
+          <motion.div
+            initial={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="absolute inset-0 z-50 bg-[#0a0f0c] flex flex-col items-center justify-center p-6"
+          >
+            <div className="relative w-24 h-24 mb-8">
+              <motion.div
+                animate={{ 
+                  scale: [1, 1.2, 1],
+                  rotate: [0, 180, 360],
+                  borderRadius: ["20%", "50%", "20%"]
+                }}
+                transition={{ duration: 3, repeat: Infinity, ease: "easeInOut" }}
+                className="absolute inset-0 bg-gradient-to-br from-primary to-green-600 opacity-20 blur-xl"
+              />
+              <div className="relative w-full h-full rounded-2xl bg-card border border-white/10 flex items-center justify-center shadow-2xl">
+                <Camera className="w-10 h-10 text-primary animate-pulse" />
+              </div>
+            </div>
+            <motion.div
+              initial={{ opacity: 0, y: 10 }}
+              animate={{ opacity: 1, y: 0 }}
+              className="text-center"
+            >
+              <h3 className="text-xl font-bold text-white mb-2 tracking-tight">Initializing Camera</h3>
+              <div className="flex items-center gap-2 justify-center">
+                 <div className="w-1.5 h-1.5 rounded-full bg-primary animate-bounce [animation-delay:-0.3s]" />
+                 <div className="w-1.5 h-1.5 rounded-full bg-primary animate-bounce [animation-delay:-0.15s]" />
+                 <div className="w-1.5 h-1.5 rounded-full bg-primary animate-bounce" />
+              </div>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
 
       {/* Camera feed */}
       <video
@@ -180,6 +225,7 @@ const CameraView = ({ onCapture, onFileUpload }: CameraViewProps) => {
         muted
         className="w-full h-full object-cover"
       />
+
 
       {/* Flash effect */}
       <AnimatePresence>

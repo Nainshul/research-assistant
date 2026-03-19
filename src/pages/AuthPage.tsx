@@ -43,6 +43,7 @@ const AuthPage = () => {
   const [isGoogleLoading, setIsGoogleLoading] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
   const [resetEmailSent, setResetEmailSent] = useState(false);
+  const [rememberMe, setRememberMe] = useState(true);
 
   const from = location.state?.from?.pathname || '/';
 
@@ -134,6 +135,13 @@ const AuthPage = () => {
             variant: 'destructive',
           });
         } else {
+          // Save remember me preference
+          if (rememberMe) {
+            localStorage.setItem('crop-doc-remember', 'true');
+          } else {
+            localStorage.removeItem('crop-doc-remember');
+            sessionStorage.setItem('crop-doc-session-only', 'true');
+          }
           toast({
             title: 'Welcome back!',
             description: 'You have signed in successfully.',
@@ -308,6 +316,18 @@ const AuthPage = () => {
                 </button>
               </div>
             </div>
+          )}
+
+          {mode === 'signin' && (
+            <label className="flex items-center gap-2 cursor-pointer select-none">
+              <input
+                type="checkbox"
+                checked={rememberMe}
+                onChange={(e) => setRememberMe(e.target.checked)}
+                className="w-4 h-4 rounded border-border accent-primary cursor-pointer"
+              />
+              <span className="text-sm text-muted-foreground">Remember me on this device</span>
+            </label>
           )}
 
           <Button

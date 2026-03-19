@@ -4,6 +4,7 @@ interface UseCameraReturn {
   videoRef: React.RefObject<HTMLVideoElement>;
   canvasRef: React.RefObject<HTMLCanvasElement>;
   isStreaming: boolean;
+  isInitializing: boolean;
   error: string | null;
   startCamera: () => Promise<void>;
   stopCamera: () => void;
@@ -15,11 +16,13 @@ export const useCamera = (): UseCameraReturn => {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const streamRef = useRef<MediaStream | null>(null);
   const [isStreaming, setIsStreaming] = useState(false);
+  const [isInitializing, setIsInitializing] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   const startCamera = useCallback(async () => {
     try {
       setError(null);
+      setIsInitializing(true);
 
       // Check if mediaDevices is supported
       if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
@@ -29,11 +32,12 @@ export const useCamera = (): UseCameraReturn => {
       }
 
       // Request camera with preference for back camera (environment)
+      // Low resolution (640x480) for better stability on mobile
       const stream = await navigator.mediaDevices.getUserMedia({
         video: {
           facingMode: "environment",
-          width: { ideal: 1280 },
-          height: { ideal: 720 },
+          width: { ideal: 640 },
+          height: { ideal: 480 },
         },
         audio: false,
       });
@@ -42,24 +46,31 @@ export const useCamera = (): UseCameraReturn => {
         videoRef.current.srcObject = stream;
         streamRef.current = stream;
         setIsStreaming(true);
+        setIsInitializing(false);
       }
     } catch (err) {
       const message =
         err instanceof Error ? err.message : "Failed to access camera";
       setError(message);
       console.error("Camera error:", err);
+    } finally {
+      setIsInitializing(false);
     }
   }, []);
 
   const stopCamera = useCallback(() => {
     if (streamRef.current) {
-      streamRef.current.getTracks().forEach((track) => track.stop());
+      streamRef.current.getTracks().forEach((track) => {
+        track.stop();
+        track.enabled = false;
+      });
       streamRef.current = null;
     }
     if (videoRef.current) {
       videoRef.current.srcObject = null;
     }
     setIsStreaming(false);
+    setIsInitializing(false);
   }, []);
 
   const captureImage = useCallback((): string | null => {
@@ -86,6 +97,7 @@ export const useCamera = (): UseCameraReturn => {
     videoRef,
     canvasRef,
     isStreaming,
+    isInitializing,
     error,
     startCamera,
     stopCamera,

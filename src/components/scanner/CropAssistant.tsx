@@ -28,11 +28,11 @@ const CropAssistant: React.FC<AssistantProps> = ({ diseaseName, cropName }) => {
         }
     ]);
 
-    const messagesEndRef = useRef<HTMLDivElement>(null);
+    const chatContainerRef = useRef<HTMLDivElement>(null);
 
     useEffect(() => {
-        if (isExpanded) {
-            messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+        if (isExpanded && chatContainerRef.current) {
+            chatContainerRef.current.scrollTop = chatContainerRef.current.scrollHeight;
         }
     }, [messages, isExpanded]);
 
@@ -162,7 +162,7 @@ const CropAssistant: React.FC<AssistantProps> = ({ diseaseName, cropName }) => {
                         className="flex flex-col"
                     >
                         {/* Chat Area */}
-                        <div className="h-[350px] overflow-y-auto p-4 space-y-4 scrollbar-thin scrollbar-thumb-white/10 scrollbar-track-transparent">
+                        <div ref={chatContainerRef} className="h-[350px] overflow-y-auto p-4 space-y-4 scrollbar-thin scrollbar-thumb-white/10 scrollbar-track-transparent">
                             {messages.map((msg) => (
                                 <div key={msg.id} className={cn("flex", msg.role === 'user' ? 'justify-end' : 'justify-start')}>
                                     <div className={cn(
@@ -185,7 +185,7 @@ const CropAssistant: React.FC<AssistantProps> = ({ diseaseName, cropName }) => {
                                     </div>
                                 </div>
                             )}
-                            <div ref={messagesEndRef} />
+
                         </div>
 
                         {/* Input Area */}

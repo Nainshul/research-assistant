@@ -112,6 +112,7 @@ export const loadModel = async (): Promise<void> => {
 
     // This specific model is a LayersModel
     if (!model) {
+      await tf.ready();
       try {
         model = await tf.loadLayersModel(MODEL_URL);
         console.log('LayersModel loaded successfully');
@@ -179,8 +180,10 @@ export const predictDisease = async (
     const softmaxed = predictions.softmax();
     const probabilities = await softmaxed.data();
 
+    // Aggressive cleanup for low-end devices
     predictions.dispose();
     softmaxed.dispose();
+    inputTensor.dispose();
 
     const results = Array.from(probabilities)
       .map((confidence, index) => ({
@@ -192,8 +195,12 @@ export const predictDisease = async (
       .slice(0, topK);
 
     return results;
+  } catch (err) {
+    console.error('Prediction error:', err);
+    throw err;
   } finally {
-    inputTensor.dispose();
+    // Safety disposal if not already called
+    if (inputTensor && !inputTensor.isDisposed) inputTensor.dispose();
   }
 };
 

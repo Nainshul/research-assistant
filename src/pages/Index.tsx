@@ -126,27 +126,6 @@ const Index = () => {
                   </p>
                 </div>
               </motion.div>
-
-              {/* Feature 2: Community (Now Full Width) */}
-              <motion.div
-                initial={{ x: 20, opacity: 0 }}
-                animate={{ x: 0, opacity: 1 }}
-                transition={{ delay: 0.5 }}
-                onClick={() => navigate('/community')}
-                className="col-span-2 rounded-[2rem] bg-gradient-to-r from-blue-50 to-indigo-50 dark:from-blue-950/30 dark:to-indigo-950/30 border border-blue-100 dark:border-blue-800/50 p-6 shadow-sm hover:shadow-md transition-all flex items-center justify-between cursor-pointer group relative overflow-hidden"
-              >
-                <div className="absolute -left-10 -bottom-10 w-40 h-40 bg-blue-500/10 rounded-full blur-3xl group-hover:bg-blue-500/20 transition-colors" />
-                <div className="relative z-10">
-                  <div className="w-10 h-10 rounded-full bg-blue-100 dark:bg-blue-900/30 flex items-center justify-center text-blue-600 dark:text-blue-400 mb-2">
-                    <Leaf className="w-5 h-5" />
-                  </div>
-                  <h3 className="font-bold text-lg leading-tight mb-1 text-foreground">Farmers Community</h3>
-                  <p className="text-xs font-medium text-muted-foreground">Join 10,000+ experts helping each other.</p>
-                </div>
-                <div className="relative z-10 bg-background/50 backdrop-blur-sm p-2 rounded-full border border-border/50 group-hover:scale-110 transition-transform">
-                  <span className="text-xl">👥</span>
-                </div>
-              </motion.div>
             </div>
           </motion.div>
 

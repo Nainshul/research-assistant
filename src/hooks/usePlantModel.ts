@@ -7,15 +7,20 @@ interface UsePlantModelReturn {
   error: string | null;
   loadProgress: number;
   retry: () => void;
+  initialize: () => Promise<void>;
 }
 
-export const usePlantModel = (): UsePlantModelReturn => {
+interface UsePlantModelOptions {
+  autoLoad?: boolean;
+}
+
+export const usePlantModel = (options: UsePlantModelOptions = { autoLoad: true }): UsePlantModelReturn => {
   const [isLoading, setIsLoading] = useState(false);
   const [isReady, setIsReady] = useState(isModelReady());
   const [error, setError] = useState<string | null>(null);
   const [loadProgress, setLoadProgress] = useState(0);
 
-  const initializeModel = useCallback(async () => {
+  const initialize = useCallback(async () => {
     if (isModelReady()) {
       setIsReady(true);
       setLoadProgress(100);
@@ -24,13 +29,17 @@ export const usePlantModel = (): UsePlantModelReturn => {
 
     setIsLoading(true);
     setError(null);
-    setLoadProgress(10);
+    setLoadProgress(5);
 
     try {
-      // Simulate progress during load
+      // Small delay for UI stability
+      await new Promise(resolve => setTimeout(resolve, 500));
+      
+      setLoadProgress(10);
+      
       const progressInterval = setInterval(() => {
-        setLoadProgress(prev => Math.min(prev + 10, 90));
-      }, 200);
+        setLoadProgress(prev => Math.min(prev + 5, 90));
+      }, 300);
 
       await loadModel();
       
@@ -54,13 +63,15 @@ export const usePlantModel = (): UsePlantModelReturn => {
   }, []);
 
   useEffect(() => {
-    initializeModel();
-  }, [initializeModel]);
+    if (options.autoLoad) {
+      initialize();
+    }
+  }, [initialize, options.autoLoad]);
 
   const retry = useCallback(() => {
     setError(null);
-    initializeModel();
-  }, [initializeModel]);
+    initialize();
+  }, [initialize]);
 
   return {
     isLoading,
@@ -68,5 +79,6 @@ export const usePlantModel = (): UsePlantModelReturn => {
     error,
     loadProgress,
     retry,
+    initialize, // Exported for manual control
   };
 };
